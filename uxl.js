@@ -875,14 +875,18 @@
   }
 
   function drawOrthogonalRounded(svg, start, end, opts = {}) {
-    const { endCircle = true, circleRadius = 4, arrowMarkerId = null } = opts;
-    const midX = Math.round((start.x + end.x) / 2);
-    const pts = [
-      { x: Math.round(start.x), y: Math.round(start.y) },
-      { x: midX, y: Math.round(start.y) },
-      { x: midX, y: Math.round(end.y) },
-      { x: Math.round(end.x), y: Math.round(end.y) },
-    ];
+    const { endCircle = true, circleRadius = 4, arrowMarkerId = null, points = null } = opts;
+    const pts =
+      points ??
+      (() => {
+        const midX = Math.round((start.x + end.x) / 2);
+        return [
+          { x: Math.round(start.x), y: Math.round(start.y) },
+          { x: midX, y: Math.round(start.y) },
+          { x: midX, y: Math.round(end.y) },
+          { x: Math.round(end.x), y: Math.round(end.y) },
+        ];
+      })();
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", pointsToRoundedPath(pts, 10));
     path.setAttribute("stroke-linejoin", "round");
@@ -1041,15 +1045,73 @@
       overlay.setAttribute("width", String(Math.round(mapRect.width)));
       overlay.setAttribute("height", String(Math.round(mapRect.height)));
 
+      const edgeKeys = new Set(ast.edges.map((e) => `${normalizeId(e.fromId)}=>${normalizeId(e.toId)}`));
+      const outgoing = new Map(); // from -> edges[]
       for (const e of ast.edges) {
-        const fromEl = pageEls.get(normalizeId(e.fromId));
-        const toEl = pageEls.get(normalizeId(e.toId));
+        const f = normalizeId(e.fromId);
+        if (!outgoing.has(f)) outgoing.set(f, []);
+        outgoing.get(f).push(e);
+      }
+      for (const [f, arr] of outgoing.entries()) {
+        arr.sort((a, b) => normalizeId(a.toId).localeCompare(normalizeId(b.toId)));
+      }
+
+      function rectRel(el) {
+        const r = el.getBoundingClientRect();
+        const left = r.left - mapRect.left;
+        const top = r.top - mapRect.top;
+        return {
+          left,
+          top,
+          right: left + r.width,
+          bottom: top + r.height,
+          midX: left + r.width / 2,
+          midY: top + r.height / 2,
+          w: r.width,
+          h: r.height,
+        };
+      }
+
+      for (const e of ast.edges) {
+        const fromKey = normalizeId(e.fromId);
+        const toKey = normalizeId(e.toId);
+        const fromEl = pageEls.get(fromKey);
+        const toEl = pageEls.get(toKey);
         if (!fromEl || !toEl) continue;
-        const a = fromEl.getBoundingClientRect();
-        const b = toEl.getBoundingClientRect();
-        const start = { x: a.right - mapRect.left, y: a.top + a.height / 2 - mapRect.top };
-        const end = { x: b.left - mapRect.left, y: b.top + b.height / 2 - mapRect.top };
-        drawOrthogonalRounded(overlay, start, end, { endCircle: false, arrowMarkerId });
+
+        const a = rectRel(fromEl);
+        const b = rectRel(toEl);
+
+        const dirRight = b.midX >= a.midX;
+        const pad = 2;
+        const startX = dirRight ? a.right + pad : a.left - pad;
+        const endX = dirRight ? b.left - pad : b.right + pad;
+
+        const out = outgoing.get(fromKey) || [];
+        const outIdx = Math.max(0, out.findIndex((x) => normalizeId(x.toId) === toKey));
+        const outShift = (outIdx - (out.length - 1) / 2) * 10;
+
+        const hasReverse = edgeKeys.has(`${toKey}=>${fromKey}`);
+        const pairShift = hasReverse ? (fromKey < toKey ? -6 : 6) : 0;
+
+        const startY = a.midY + outShift + pairShift;
+        const endY = b.midY + pairShift;
+
+        // Route like the sketch: orthogonal with a midX bend, spread to avoid overlap.
+        const midX = Math.round((startX + endX) / 2 + outShift * 0.3 + pairShift);
+        const pts = [
+          { x: Math.round(startX), y: Math.round(startY) },
+          { x: midX, y: Math.round(startY) },
+          { x: midX, y: Math.round(endY) },
+          { x: Math.round(endX), y: Math.round(endY) },
+        ];
+
+        drawOrthogonalRounded(
+          overlay,
+          { x: startX, y: startY },
+          { x: endX, y: endY },
+          { endCircle: false, arrowMarkerId, points: pts },
+        );
       }
     }
 
