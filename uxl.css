@@ -1,5 +1,5 @@
 .uxl-root {
-  --uxl-border: #d0d7de;
+  --uxl-border: #8c959f;
   --uxl-text: #24292f;
   --uxl-muted: #57606a;
   --uxl-bg: #ffffff;
@@ -61,10 +61,6 @@
 }
 
 .uxl-map__grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 18px 28px;
   position: relative;
   z-index: 1;
 }
@@ -76,6 +72,7 @@
   min-height: 48px;
   min-width: 160px;
   width: fit-content;
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -907,7 +907,7 @@
     const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     overlay.classList.add("uxl-overlay", "uxl-overlay--map");
     overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    const arrowId = ensureArrowMarker(overlay, "uxl-arrow");
+    const arrowId = "uxl-arrow";
 
     const pageEls = new Map(); // lowerId -> el
     for (const p of ast.pages) {
@@ -921,9 +921,121 @@
 
     map.append(grid, overlay);
 
+    function clearSvgKeepDefs(svg) {
+      const defs = svg.querySelector("defs");
+      // Remove all children except defs
+      const children = Array.from(svg.childNodes);
+      for (const ch of children) {
+        if (ch === defs) continue;
+        svg.removeChild(ch);
+      }
+      if (!svg.querySelector("defs")) {
+        const d = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        svg.prepend(d);
+      }
+    }
+
+    function layoutAsTree() {
+      // Root: first page in the block
+      const pagesInOrder = ast.pages.map((p) => normalizeId(p.id));
+      const rootId = pagesInOrder[0] || null;
+      const level = new Map(); // pageId -> number
+      if (rootId) level.set(rootId, 0);
+
+      const outgoing = new Map(); // from -> Set(to)
+      for (const e of ast.edges) {
+        const f = normalizeId(e.fromId);
+        const t = normalizeId(e.toId);
+        if (!outgoing.has(f)) outgoing.set(f, new Set());
+        outgoing.get(f).add(t);
+      }
+
+      // BFS-like relax
+      const q = [];
+      if (rootId) q.push(rootId);
+      while (q.length) {
+        const cur = q.shift();
+        const curLvl = level.get(cur) ?? 0;
+        for (const nxt of outgoing.get(cur) || []) {
+          const nextLvl = curLvl + 1;
+          const prev = level.get(nxt);
+          if (prev == null || nextLvl < prev) {
+            level.set(nxt, nextLvl);
+            q.push(nxt);
+          }
+        }
+      }
+
+      // Unreachable pages: place at level 0 after root, stacked below
+      for (const pid of pagesInOrder) {
+        if (!level.has(pid)) level.set(pid, 0);
+      }
+
+      // Group by level; preserve original order within each level
+      const groups = new Map(); // lvl -> [pageId]
+      for (const pid of pagesInOrder) {
+        const lvl = level.get(pid) ?? 0;
+        if (!groups.has(lvl)) groups.set(lvl, []);
+        groups.get(lvl).push(pid);
+      }
+      const levels = Array.from(groups.keys()).sort((a, b) => a - b);
+
+      // Measure node sizes
+      const sizes = new Map(); // pid -> {w,h}
+      for (const pid of pagesInOrder) {
+        const elp = pageEls.get(pid);
+        if (!elp) continue;
+        const r = elp.getBoundingClientRect();
+        sizes.set(pid, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+      }
+
+      const colGap = 80;
+      const rowGap = 26;
+
+      const colWidths = new Map();
+      for (const lvl of levels) {
+        let maxW = 0;
+        for (const pid of groups.get(lvl)) {
+          const s = sizes.get(pid) || { w: 160, h: 48 };
+          maxW = Math.max(maxW, s.w);
+        }
+        colWidths.set(lvl, maxW);
+      }
+
+      // X offsets
+      const xOffset = new Map();
+      let x = 0;
+      for (const lvl of levels) {
+        xOffset.set(lvl, x);
+        x += (colWidths.get(lvl) || 160) + colGap;
+      }
+
+      // Place nodes
+      let totalH = 0;
+      for (const lvl of levels) {
+        let y = 0;
+        for (const pid of groups.get(lvl)) {
+          const elp = pageEls.get(pid);
+          if (!elp) continue;
+          const s = sizes.get(pid) || { w: 160, h: 48 };
+          elp.style.left = `${xOffset.get(lvl)}px`;
+          elp.style.top = `${y}px`;
+          elp.style.width = `${s.w}px`;
+          elp.style.height = `${s.h}px`;
+          y += s.h + rowGap;
+        }
+        totalH = Math.max(totalH, y);
+      }
+
+      grid.style.width = `${Math.max(0, x - colGap)}px`;
+      grid.style.height = `${Math.max(0, totalH - rowGap)}px`;
+    }
+
     function redraw() {
-      // clear
-      while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+      // clear but keep defs/markers
+      clearSvgKeepDefs(overlay);
+      ensureArrowMarker(overlay, arrowId);
+
       const mapRect = map.getBoundingClientRect();
       overlay.setAttribute("viewBox", `0 0 ${Math.round(mapRect.width)} ${Math.round(mapRect.height)}`);
       overlay.setAttribute("width", String(Math.round(mapRect.width)));
@@ -937,12 +1049,20 @@
         const b = toEl.getBoundingClientRect();
         const start = { x: a.right - mapRect.left, y: a.top + a.height / 2 - mapRect.top };
         const end = { x: b.left - mapRect.left, y: b.top + b.height / 2 - mapRect.top };
-        drawOrthogonalRounded(overlay, start, end, { endCircle: false, arrowMarkerId: arrowId });
+        drawOrthogonalRounded(overlay, start, end, { endCircle: false, arrowMarkerId });
       }
     }
 
-    queueMicrotask(() => redraw());
-    window.addEventListener("resize", () => redraw());
+    function relayoutAndRedraw() {
+      // Wait for layout measurement after DOM insertion.
+      requestAnimationFrame(() => {
+        layoutAsTree();
+        redraw();
+      });
+    }
+
+    relayoutAndRedraw();
+    window.addEventListener("resize", () => relayoutAndRedraw());
 
     return map;
   }
@@ -1006,7 +1126,8 @@
         const tRect = target.getBoundingClientRect();
 
         const start = { x: dotRect.left + dotRect.width / 2 - bodyRect.left, y: dotRect.top + dotRect.height / 2 - bodyRect.top };
-        const end = { x: tRect.left + tRect.width / 2 - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
+        // End point should land on the edge of the element facing the hints list (right edge).
+        const end = { x: tRect.right - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
         drawOrthogonalRounded(overlay, start, end, { endCircle: true, circleRadius: 2, arrowMarkerId: null });
       }
     }
@@ -1063,5 +1184,6 @@
     extractUxlBlocksFromMarkdown,
   };
 })();
+
 
 
