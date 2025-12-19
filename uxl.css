@@ -105,6 +105,7 @@
 /* Map overlay: thinner + arrows (uses currentColor for stroke/arrow fill) */
 .uxl-overlay--map {
   color: var(--uxl-muted);
+  z-index: 2;
 }
 .uxl-overlay--map path,
 .uxl-overlay--map circle {
