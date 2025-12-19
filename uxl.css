@@ -55,8 +55,9 @@
 }
 
 .uxl-map__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 10px 12px;
   position: relative;
   z-index: 1;
@@ -67,11 +68,14 @@
   border: 1px solid var(--uxl-border);
   padding: 10px;
   min-height: 48px;
+  min-width: 160px;
+  width: fit-content;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .uxl-overlay {
@@ -121,7 +125,7 @@
 
 .uxl-canvas {
   position: relative;
-  background: var(--uxl-bg);
+  background: var(--uxl-panel);
   border: 1px solid var(--uxl-border);
   overflow: hidden;
 }
