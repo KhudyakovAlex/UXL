@@ -13,6 +13,7 @@
 
 .uxl-root * {
   box-sizing: border-box;
+  border-radius: 0;
 }
 
 .uxl-title {
@@ -24,7 +25,6 @@
   border: 1px solid color-mix(in srgb, var(--uxl-error) 50%, var(--uxl-border));
   background: color-mix(in srgb, var(--uxl-error) 6%, var(--uxl-bg));
   padding: 12px;
-  border-radius: 10px;
 }
 
 .uxl-error__head {
@@ -41,7 +41,6 @@
 .uxl-error__line {
   margin-top: 10px;
   padding: 8px 10px;
-  border-radius: 8px;
   border: 1px solid var(--uxl-border);
   background: var(--uxl-panel);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -51,10 +50,6 @@
 
 /* Map */
 .uxl-map {
-  border: 1px solid var(--uxl-border);
-  background: var(--uxl-panel);
-  border-radius: 12px;
-  padding: 12px;
   position: relative;
   margin-bottom: 14px;
 }
@@ -70,7 +65,6 @@
 .uxl-map__page {
   background: var(--uxl-bg);
   border: 1px solid var(--uxl-border);
-  border-radius: 10px;
   padding: 10px;
   min-height: 48px;
   display: flex;
@@ -96,7 +90,7 @@
 .uxl-overlay circle {
   stroke: var(--uxl-muted);
   stroke-width: 2;
-  fill: var(--uxl-panel);
+  fill: none;
 }
 
 /* Pages */
@@ -106,16 +100,11 @@
 }
 
 .uxl-page {
-  border: 1px solid var(--uxl-border);
-  border-radius: 12px;
-  overflow: clip;
-  background: var(--uxl-bg);
+  padding-bottom: 6px;
 }
 
 .uxl-page__head {
-  padding: 10px 12px;
-  background: var(--uxl-panel);
-  border-bottom: 1px solid var(--uxl-border);
+  padding: 6px 0 10px;
   font-weight: 800;
 }
 
@@ -123,15 +112,10 @@
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(260px, 360px);
   gap: 12px;
-  padding: 12px;
   position: relative;
 }
 
 .uxl-canvas-wrap {
-  border: 1px solid var(--uxl-border);
-  border-radius: 10px;
-  padding: 10px;
-  background: color-mix(in srgb, var(--uxl-panel) 60%, var(--uxl-bg));
   overflow: auto;
 }
 
@@ -139,21 +123,13 @@
   position: relative;
   background: var(--uxl-bg);
   border: 1px solid var(--uxl-border);
-  border-radius: 10px;
   overflow: hidden;
 }
 
 .uxl-hints {
-  border: 1px solid var(--uxl-border);
-  border-radius: 10px;
-  padding: 10px 10px 10px 12px;
-  background: var(--uxl-panel);
+  padding: 0;
+  background: transparent;
   min-height: 100px;
-}
-
-.uxl-hints__title {
-  font-weight: 800;
-  margin: 0 0 8px;
 }
 
 .uxl-hints__list {
@@ -172,10 +148,9 @@
   position: absolute;
 }
 
-.uxl-F, .uxl-P, .uxl-T {
-  border: 1px dashed color-mix(in srgb, var(--uxl-border) 80%, var(--uxl-muted));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--uxl-panel) 35%, var(--uxl-bg));
+.uxl-T {
+  border: 1px solid var(--uxl-border);
+  background: var(--uxl-bg);
 }
 
 .uxl-C {
@@ -187,7 +162,6 @@
 
 .uxl-B {
   padding: 6px 10px;
-  border-radius: 8px;
   border: 1px solid var(--uxl-border);
   background: var(--uxl-bg);
   cursor: pointer;

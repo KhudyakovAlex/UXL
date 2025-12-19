@@ -722,8 +722,14 @@
     function renderNode(node, parentEl) {
       const tag = node.tag;
       let nodeEl;
-      if (tag === "F") nodeEl = el("div", { class: "uxl-node uxl-F", "data-uxl-uid": node.uid });
-      else if (tag === "C") nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
+
+      // F is invisible: used only for layout, not rendered as a DOM element.
+      if (tag === "F") {
+        for (const ch of node.children || []) renderNode(ch, parentEl);
+        return null;
+      }
+
+      if (tag === "C") nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
       else if (tag === "B") {
         nodeEl = el("button", { class: "uxl-node uxl-B", type: "button", "data-uxl-uid": node.uid, text: node.caption || "" });
       } else if (tag === "T") {
@@ -767,15 +773,7 @@
       domByUid.set(node.uid, nodeEl);
       parentEl.append(nodeEl);
 
-      if (tag === "F" || tag === "T") {
-        for (const ch of node.children || []) {
-          if (tag === "T") {
-            // T children are structural (TC/TH/TD) and already rendered in HTML table, no nested UI children
-            continue;
-          }
-          renderNode(ch, nodeEl);
-        }
-      }
+      // No nested rendering needed: T children are structural; F is invisible and handled above.
       return nodeEl;
     }
 
@@ -783,7 +781,7 @@
     for (const ch of rootNode.children || []) renderNode(ch, containerEl);
 
     // Layout pass (top-down)
-    function applyLayout(node, parentRect) {
+    function applyLayout(node, parentRect, offset) {
       const tag = node.tag;
       const isContainer = tag === "F" || tag === "T";
       const size = node.size || null;
@@ -792,21 +790,23 @@
 
       const nodeEl = domByUid.get(node.uid);
       if (nodeEl) {
-        nodeEl.style.left = `${rect.x}px`;
-        nodeEl.style.top = `${rect.y}px`;
+        nodeEl.style.left = `${offset.x + rect.x}px`;
+        nodeEl.style.top = `${offset.y + rect.y}px`;
         if (rect.w != null) nodeEl.style.width = `${rect.w}px`;
         if (rect.h != null) nodeEl.style.height = `${rect.h}px`;
       }
 
       if (tag === "F") {
-        for (const ch of node.children || []) applyLayout(ch, rect);
+        // F is an invisible container: children coords are relative to its rect, but rendered in the same canvas.
+        const nextOffset = { x: offset.x + rect.x, y: offset.y + rect.y };
+        for (const ch of node.children || []) applyLayout(ch, rect, nextOffset);
       }
-      // T has no UI children beyond its table
+      // T has no UI children beyond its table; B/C have no children by validation.
     }
 
     const rootRect = { x: 0, y: 0, w: windowSize.w, h: windowSize.h };
     // Apply layout starting at children of P (relative to canvas)
-    for (const ch of rootNode.children || []) applyLayout(ch, rootRect);
+    for (const ch of rootNode.children || []) applyLayout(ch, rootRect, { x: 0, y: 0 });
 
     return domByUid;
   }
@@ -910,7 +910,6 @@
     canvasWrap.append(canvas);
 
     const hints = el("div", { class: "uxl-hints" });
-    hints.append(el("div", { class: "uxl-hints__title", text: "Hints" }));
     const list = el("ul", { class: "uxl-hints__list" });
     hints.append(list);
 
