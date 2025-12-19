@@ -1,0 +1,221 @@
+.uxl-root {
+  --uxl-border: #d0d7de;
+  --uxl-text: #24292f;
+  --uxl-muted: #57606a;
+  --uxl-bg: #ffffff;
+  --uxl-panel: #f6f8fa;
+  --uxl-accent: #0969da;
+  --uxl-error: #cf222e;
+
+  color: var(--uxl-text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+.uxl-root * {
+  box-sizing: border-box;
+}
+
+.uxl-title {
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.uxl-error {
+  border: 1px solid color-mix(in srgb, var(--uxl-error) 50%, var(--uxl-border));
+  background: color-mix(in srgb, var(--uxl-error) 6%, var(--uxl-bg));
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.uxl-error__head {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.uxl-error__meta {
+  color: var(--uxl-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+}
+
+.uxl-error__line {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--uxl-border);
+  background: var(--uxl-panel);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  white-space: pre;
+  overflow: auto;
+}
+
+/* Map */
+.uxl-map {
+  border: 1px solid var(--uxl-border);
+  background: var(--uxl-panel);
+  border-radius: 12px;
+  padding: 12px;
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.uxl-map__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.uxl-map__page {
+  background: var(--uxl-bg);
+  border: 1px solid var(--uxl-border);
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 600;
+}
+
+.uxl-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.uxl-overlay path {
+  stroke: var(--uxl-muted);
+  stroke-width: 2;
+  fill: none;
+}
+
+.uxl-overlay circle {
+  stroke: var(--uxl-muted);
+  stroke-width: 2;
+  fill: var(--uxl-panel);
+}
+
+/* Pages */
+.uxl-pages {
+  display: grid;
+  gap: 18px;
+}
+
+.uxl-page {
+  border: 1px solid var(--uxl-border);
+  border-radius: 12px;
+  overflow: clip;
+  background: var(--uxl-bg);
+}
+
+.uxl-page__head {
+  padding: 10px 12px;
+  background: var(--uxl-panel);
+  border-bottom: 1px solid var(--uxl-border);
+  font-weight: 800;
+}
+
+.uxl-page__body {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(260px, 360px);
+  gap: 12px;
+  padding: 12px;
+  position: relative;
+}
+
+.uxl-canvas-wrap {
+  border: 1px solid var(--uxl-border);
+  border-radius: 10px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--uxl-panel) 60%, var(--uxl-bg));
+  overflow: auto;
+}
+
+.uxl-canvas {
+  position: relative;
+  background: var(--uxl-bg);
+  border: 1px solid var(--uxl-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.uxl-hints {
+  border: 1px solid var(--uxl-border);
+  border-radius: 10px;
+  padding: 10px 10px 10px 12px;
+  background: var(--uxl-panel);
+  min-height: 100px;
+}
+
+.uxl-hints__title {
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.uxl-hints__list {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--uxl-text);
+}
+
+.uxl-hints__item {
+  margin: 4px 0;
+  line-height: 1.3;
+}
+
+/* Rendered elements */
+.uxl-node {
+  position: absolute;
+}
+
+.uxl-F, .uxl-P, .uxl-T {
+  border: 1px dashed color-mix(in srgb, var(--uxl-border) 80%, var(--uxl-muted));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--uxl-panel) 35%, var(--uxl-bg));
+}
+
+.uxl-C {
+  padding: 4px 6px;
+  color: var(--uxl-text);
+  background: transparent;
+  white-space: pre-wrap;
+}
+
+.uxl-B {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--uxl-border);
+  background: var(--uxl-bg);
+  cursor: pointer;
+}
+
+.uxl-B:hover {
+  border-color: color-mix(in srgb, var(--uxl-accent) 40%, var(--uxl-border));
+}
+
+.uxl-T table {
+  width: 100%;
+  height: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: var(--uxl-bg);
+}
+
+.uxl-T th, .uxl-T td {
+  border: 1px solid var(--uxl-border);
+  padding: 6px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uxl-T th {
+  background: color-mix(in srgb, var(--uxl-panel) 70%, var(--uxl-bg));
+  font-weight: 800;
+}
+
+
