@@ -810,14 +810,78 @@
       if (tag === "F") {
         // F is an invisible container: children coords are relative to its rect, but rendered in the same canvas.
         const nextOffset = { x: offset.x + rect.x, y: offset.y + rect.y };
-        for (const ch of node.children || []) applyLayout(ch, rect, nextOffset);
+        layoutChildren(node.children || [], rect, nextOffset);
       }
       // T has no UI children beyond its table; B/C have no children by validation.
     }
 
+    function resolveNodeSizePx(node, parentW, parentH) {
+      const a = node.align || { L: false, R: false, T: false, B: false };
+      const stretchX = a.L && a.R;
+      const stretchY = a.T && a.B;
+
+      const w = node.size?.w ? resolveDim(node.size.w, parentW) : stretchX ? parentW : null;
+      const h = node.size?.h ? resolveDim(node.size.h, parentH) : stretchY ? parentH : null;
+      return { w, h };
+    }
+
+    function computeEdgeReserves(children, parentW, parentH) {
+      let left = 0;
+      let right = 0;
+      let top = 0;
+      let bottom = 0;
+
+      for (const ch of children) {
+        const a = ch.align || { L: false, R: false, T: false, B: false };
+        const sz = resolveNodeSizePx(ch, parentW, parentH);
+
+        // Reserve only for edge-anchored, non-stretch in that axis.
+        if (a.L && !a.R && sz.w != null) left = Math.max(left, sz.w);
+        if (a.R && !a.L && sz.w != null) right = Math.max(right, sz.w);
+        if (a.T && !a.B && sz.h != null) top = Math.max(top, sz.h);
+        if (a.B && !a.T && sz.h != null) bottom = Math.max(bottom, sz.h);
+      }
+
+      const w = Math.max(0, parentW - left - right);
+      const h = Math.max(0, parentH - top - bottom);
+      return { left, right, top, bottom, content: { x: left, y: top, w, h } };
+    }
+
+    function layoutChildren(children, parentRect, parentOffset) {
+      if (!children || children.length === 0) return;
+
+      // Reserve edges based on explicit sizes of edge-anchored siblings.
+      const reserves = computeEdgeReserves(children, parentRect.w, parentRect.h);
+      const c = reserves.content;
+
+      for (const ch of children) {
+        const a = ch.align || { L: false, R: false, T: false, B: false };
+        const stretchX = a.L && a.R;
+        const stretchY = a.T && a.B;
+        const centerX = !a.L && !a.R;
+        const centerY = !a.T && !a.B;
+
+        // For stretch/centered items, constrain available area to the remaining content box,
+        // so they "bump" into edge-anchored siblings instead of overlapping them.
+        const useContentX = stretchX || centerX;
+        const useContentY = stretchY || centerY;
+
+        const availX = useContentX ? c.x : 0;
+        const availY = useContentY ? c.y : 0;
+        const availW = useContentX ? c.w : parentRect.w;
+        const availH = useContentY ? c.h : parentRect.h;
+
+        applyLayout(
+          ch,
+          { x: 0, y: 0, w: availW, h: availH },
+          { x: parentOffset.x + availX, y: parentOffset.y + availY },
+        );
+      }
+    }
+
     const rootRect = { x: 0, y: 0, w: windowSize.w, h: windowSize.h };
     // Apply layout starting at children of P (relative to canvas)
-    for (const ch of rootNode.children || []) applyLayout(ch, rootRect, { x: 0, y: 0 });
+    layoutChildren(rootNode.children || [], rootRect, { x: 0, y: 0 });
 
     return domByUid;
   }
