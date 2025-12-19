@@ -901,7 +901,8 @@
 
   function renderPageSection(ast, pageNode) {
     const page = el("div", { class: "uxl-page", "data-page-id": normalizeId(pageNode.id) });
-    const head = el("div", { class: "uxl-page__head", text: pageNode.caption || pageNode.id });
+    const headText = pageNode.caption || pageNode.id;
+    const head = el("div", { class: "uxl-page__head", text: `Страница ${headText}` });
     const body = el("div", { class: "uxl-page__body" });
     const canvasWrap = el("div", { class: "uxl-canvas-wrap" });
     const canvas = el("div", { class: "uxl-canvas" });
@@ -965,6 +966,7 @@
 
   function renderAst(ast) {
     const root = el("div", { class: "uxl-root" });
+    root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });
     for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p));
