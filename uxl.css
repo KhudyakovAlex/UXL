@@ -6,6 +6,7 @@
   --uxl-panel: #f6f8fa;
   --uxl-accent: #0969da;
   --uxl-error: #cf222e;
+  --uxl-hint: #d00000;
 
   color: var(--uxl-text);
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -63,7 +64,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 10px 12px;
+  gap: 18px 28px;
   position: relative;
   z-index: 1;
 }
@@ -103,11 +104,30 @@
   fill: none;
 }
 
+/* Map overlay: thinner + arrows (uses currentColor for stroke/arrow fill) */
+.uxl-overlay--map {
+  color: var(--uxl-muted);
+}
+.uxl-overlay--map path,
+.uxl-overlay--map circle {
+  stroke: currentColor;
+}
+.uxl-overlay--map path {
+  stroke-width: 1;
+}
+
 /* Hint callouts: dark red, thin */
+.uxl-overlay--hints {
+  color: var(--uxl-hint);
+}
 .uxl-overlay--hints path,
 .uxl-overlay--hints circle {
-  stroke: #8b0000;
-  stroke-width: 1;
+  stroke: currentColor;
+  stroke-width: 0.75;
+  stroke-dasharray: 4 3;
+}
+.uxl-overlay--hints circle {
+  fill: currentColor;
 }
 
 /* Pages */
@@ -152,7 +172,7 @@
 .uxl-hints__list {
   margin: 0;
   padding-left: 0;
-  color: #8b0000;
+  color: var(--uxl-hint);
   list-style: none;
 }
 
@@ -165,15 +185,16 @@
 }
 
 .uxl-hint-dot {
-  width: 10px;
-  height: 10px;
-  border: 1px solid #8b0000;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--uxl-hint);
   border-radius: 50%;
+  background: var(--uxl-hint);
   flex: 0 0 auto;
 }
 
 .uxl-hint-text {
-  color: #8b0000;
+  color: var(--uxl-hint);
 }
 
 /* Rendered elements */

@@ -848,7 +848,34 @@
     return d;
   }
 
-  function drawOrthogonalRounded(svg, start, end) {
+  function ensureArrowMarker(svg, id = "uxl-arrow") {
+    // Create marker once per SVG.
+    const existing = svg.querySelector(`marker#${CSS.escape(id)}`);
+    if (existing) return id;
+    let defs = svg.querySelector("defs");
+    if (!defs) {
+      defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      svg.prepend(defs);
+    }
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    marker.setAttribute("id", id);
+    marker.setAttribute("viewBox", "0 0 10 10");
+    marker.setAttribute("refX", "9");
+    marker.setAttribute("refY", "5");
+    marker.setAttribute("markerWidth", "6");
+    marker.setAttribute("markerHeight", "6");
+    marker.setAttribute("orient", "auto");
+    marker.setAttribute("markerUnits", "strokeWidth");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+    path.setAttribute("fill", "currentColor");
+    marker.append(path);
+    defs.append(marker);
+    return id;
+  }
+
+  function drawOrthogonalRounded(svg, start, end, opts = {}) {
+    const { endCircle = true, circleRadius = 4, arrowMarkerId = null } = opts;
     const midX = Math.round((start.x + end.x) / 2);
     const pts = [
       { x: Math.round(start.x), y: Math.round(start.y) },
@@ -858,21 +885,29 @@
     ];
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", pointsToRoundedPath(pts, 10));
+    path.setAttribute("stroke-linejoin", "round");
+    path.setAttribute("stroke-linecap", "round");
+    if (arrowMarkerId) path.setAttribute("marker-end", `url(#${arrowMarkerId})`);
     svg.append(path);
 
-    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    circle.setAttribute("cx", String(Math.round(end.x)));
-    circle.setAttribute("cy", String(Math.round(end.y)));
-    circle.setAttribute("r", "4");
-    svg.append(circle);
+    if (endCircle) {
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", String(Math.round(end.x)));
+      circle.setAttribute("cy", String(Math.round(end.y)));
+      circle.setAttribute("r", String(circleRadius));
+      // Filled circle for hints; fill controlled via CSS (stroke is also via CSS).
+      circle.setAttribute("fill", "currentColor");
+      svg.append(circle);
+    }
   }
 
   function renderMap(ast) {
     const map = el("div", { class: "uxl-map" });
     const grid = el("div", { class: "uxl-map__grid" });
     const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    overlay.classList.add("uxl-overlay");
+    overlay.classList.add("uxl-overlay", "uxl-overlay--map");
     overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const arrowId = ensureArrowMarker(overlay, "uxl-arrow");
 
     const pageEls = new Map(); // lowerId -> el
     for (const p of ast.pages) {
@@ -902,7 +937,7 @@
         const b = toEl.getBoundingClientRect();
         const start = { x: a.right - mapRect.left, y: a.top + a.height / 2 - mapRect.top };
         const end = { x: b.left - mapRect.left, y: b.top + b.height / 2 - mapRect.top };
-        drawOrthogonalRounded(overlay, start, end);
+        drawOrthogonalRounded(overlay, start, end, { endCircle: false, arrowMarkerId: arrowId });
       }
     }
 
@@ -972,7 +1007,7 @@
 
         const start = { x: dotRect.left + dotRect.width / 2 - bodyRect.left, y: dotRect.top + dotRect.height / 2 - bodyRect.top };
         const end = { x: tRect.left + tRect.width / 2 - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
-        drawOrthogonalRounded(overlay, start, end);
+        drawOrthogonalRounded(overlay, start, end, { endCircle: true, circleRadius: 2, arrowMarkerId: null });
       }
     }
 
