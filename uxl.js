@@ -923,7 +923,9 @@
       grid.append(pageEl);
     }
 
-    map.append(grid, overlay);
+    // Put overlay inside the grid so it shares the same coordinate space and size (like hint callouts).
+    grid.append(overlay);
+    map.append(grid);
 
     function clearSvgKeepDefs(svg) {
       const defs = svg.querySelector("defs");
@@ -1040,10 +1042,10 @@
       clearSvgKeepDefs(overlay);
       ensureArrowMarker(overlay, arrowId);
 
-      const mapRect = map.getBoundingClientRect();
-      overlay.setAttribute("viewBox", `0 0 ${Math.round(mapRect.width)} ${Math.round(mapRect.height)}`);
-      overlay.setAttribute("width", String(Math.round(mapRect.width)));
-      overlay.setAttribute("height", String(Math.round(mapRect.height)));
+      const gridRect = grid.getBoundingClientRect();
+      overlay.setAttribute("viewBox", `0 0 ${Math.round(gridRect.width)} ${Math.round(gridRect.height)}`);
+      overlay.setAttribute("width", String(Math.round(gridRect.width)));
+      overlay.setAttribute("height", String(Math.round(gridRect.height)));
 
       const edgeKeys = new Set(ast.edges.map((e) => `${normalizeId(e.fromId)}=>${normalizeId(e.toId)}`));
       const outgoing = new Map(); // from -> edges[]
@@ -1058,8 +1060,8 @@
 
       function rectRel(el) {
         const r = el.getBoundingClientRect();
-        const left = r.left - mapRect.left;
-        const top = r.top - mapRect.top;
+        const left = r.left - gridRect.left;
+        const top = r.top - gridRect.top;
         return {
           left,
           top,
