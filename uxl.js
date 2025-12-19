@@ -667,6 +667,17 @@
     return node;
   }
 
+  function formatMapCaption(caption) {
+    const s = String(caption || "").trim();
+    if (!s) return "";
+    const words = s.split(/\s+/).filter(Boolean);
+    if (words.length <= 3) return escapeHtml(s);
+    // Insert line breaks every 3 words.
+    const lines = [];
+    for (let i = 0; i < words.length; i += 3) lines.push(words.slice(i, i + 3).join(" "));
+    return lines.map(escapeHtml).join("<br>");
+  }
+
   function renderError(err) {
     const root = el("div", { class: "uxl-root" });
     const head = el("div", { class: "uxl-error__head", text: "UXL error" });
@@ -866,7 +877,9 @@
     const pageEls = new Map(); // lowerId -> el
     for (const p of ast.pages) {
       const idKey = normalizeId(p.id);
-      const pageEl = el("div", { class: "uxl-map__page", "data-page-id": idKey, text: p.caption || p.id });
+      const pageEl = el("div", { class: "uxl-map__page", "data-page-id": idKey });
+      // Use controlled <br> wrapping for long captions (more than 3 words).
+      pageEl.innerHTML = formatMapCaption(p.caption || p.id);
       pageEls.set(idKey, pageEl);
       grid.append(pageEl);
     }
@@ -915,7 +928,7 @@
     hints.append(list);
 
     const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    overlay.classList.add("uxl-overlay");
+    overlay.classList.add("uxl-overlay", "uxl-overlay--hints");
     overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     body.append(canvasWrap, hints, overlay);
     page.append(head, body);
@@ -934,7 +947,9 @@
     for (const ch of pageNode.children || []) collectHints(ch);
 
     for (const n of hintItems) {
-      const li = el("li", { class: "uxl-hints__item", "data-uxl-uid": n.uid, text: n.hint });
+      const dot = el("span", { class: "uxl-hint-dot", "data-uxl-dot": "1" });
+      const text = el("span", { class: "uxl-hint-text", text: n.hint });
+      const li = el("li", { class: "uxl-hints__item", "data-uxl-uid": n.uid }, [dot, text]);
       list.append(li);
     }
 
@@ -949,10 +964,13 @@
         const li = list.querySelector(`li[data-uxl-uid="${CSS.escape(n.uid)}"]`);
         const target = domByUid.get(n.uid);
         if (!li || !target) continue;
+        const dot = li.querySelector('[data-uxl-dot="1"]');
+        if (!dot) continue;
         const liRect = li.getBoundingClientRect();
+        const dotRect = dot.getBoundingClientRect();
         const tRect = target.getBoundingClientRect();
 
-        const start = { x: liRect.left - bodyRect.left, y: liRect.top + liRect.height / 2 - bodyRect.top };
+        const start = { x: dotRect.left + dotRect.width / 2 - bodyRect.left, y: dotRect.top + dotRect.height / 2 - bodyRect.top };
         const end = { x: tRect.left + tRect.width / 2 - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
         drawOrthogonalRounded(overlay, start, end);
       }
