@@ -119,8 +119,9 @@
 }
 
 .uxl-map__page {
-  background: var(--uxl-panel);
+  background: #e2e2e2;
   border: 1px solid var(--uxl-border);
+  border-radius: 8px;
   padding: 10px;
   min-height: 48px;
   min-width: 160px;
@@ -235,11 +236,31 @@
   max-width: 100%;
 }
 
+.uxl-canvas-scale {
+  width: fit-content;
+}
+
 .uxl-canvas {
   position: relative;
-  background: var(--uxl-panel);
+  /* Window (canvas) */
+  background: #e2e2e2;
   border: 1px solid var(--uxl-border);
+  border-radius: 8px;
   overflow: auto; /* P scrolls by default; can be overridden to hidden/scroll by inline styles */
+}
+
+/* Mobile: fit page render to screen width (avoid horizontal scroll) */
+@media (max-width: 900px) {
+  .uxl-page__body {
+    grid-template-columns: 1fr;
+  }
+  .uxl-overlay--hints {
+    display: none;
+  }
+  .uxl-canvas-wrap {
+    overflow: visible;
+    width: 100%;
+  }
 }
 
 .uxl-hints {

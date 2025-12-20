@@ -1728,10 +1728,12 @@
     const head = el("div", { class: "uxl-page__head", text: headText });
     const body = el("div", { class: "uxl-page__body" });
     const canvasWrap = el("div", { class: "uxl-canvas-wrap" });
+    const canvasScale = el("div", { class: "uxl-canvas-scale" });
     const canvas = el("div", { class: "uxl-canvas" });
     canvas.style.width = `${ast.window.w}px`;
     canvas.style.height = `${ast.window.h}px`;
-    canvasWrap.append(canvas);
+    canvasScale.append(canvas);
+    canvasWrap.append(canvasScale);
 
     const hints = el("div", { class: "uxl-hints" });
     const list = el("ul", { class: "uxl-hints__list" });
@@ -1745,6 +1747,31 @@
 
     // Render nodes; layout will run on next animation frame (after DOM insertion).
     const domByUid = layoutTree(canvas, pageNode, ast.window);
+
+    function applyResponsiveScale() {
+      // Only scale down on small screens to fit width; desktop keeps 1:1.
+      const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+      const mobile = vw <= 900;
+      if (!mobile) {
+        canvasScale.style.transform = "";
+        canvasScale.style.transformOrigin = "";
+        canvasScale.style.height = "";
+        return;
+      }
+
+      // Available width is the page body width (single-column on mobile via CSS).
+      const bodyRect = body.getBoundingClientRect();
+      const pad = 8;
+      const availW = Math.max(0, bodyRect.width - pad * 2);
+      const scale = Math.max(0.1, Math.min(1, availW / ast.window.w));
+      canvasScale.style.transformOrigin = "top left";
+      canvasScale.style.transform = `scale(${scale})`;
+      canvasScale.style.height = `${Math.round(ast.window.h * scale)}px`;
+    }
+
+    requestAnimationFrame(() => applyResponsiveScale());
+    window.addEventListener("resize", () => requestAnimationFrame(() => applyResponsiveScale()));
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", () => requestAnimationFrame(() => applyResponsiveScale()));
 
     // Wire button clicks (GOTO) to navigate between pages (scroll the browser page).
     function wireGotoClicks() {
@@ -1895,8 +1922,8 @@
       return;
     }
 
-    // Clean white page + centered window
-    document.body.style.background = "#ffffff";
+    // Prototype page background (around the window)
+    document.body.style.background = "#2b2b2b";
     document.body.style.margin = "0";
 
     const root = el("div", { class: "uxl-root uxl-proto-root" });
