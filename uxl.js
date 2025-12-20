@@ -1864,16 +1864,69 @@
     // Include page itself if it has hint.
     collectHints(pageNode);
 
+    const elementHints = hintItems.filter((n) => n.uid !== pageNode.uid);
+    const numByUid = new Map(); // uid -> 1-based number for element hints
+    for (let i = 0; i < elementHints.length; i++) {
+      numByUid.set(elementHints[i].uid, i + 1);
+    }
+
     for (const n of hintItems) {
       const text = el("span", { class: "uxl-hint-text", text: n.hint });
       const isPageHint = n.uid === pageNode.uid;
-      const children = isPageHint ? [text] : [el("span", { class: "uxl-hint-dot", "data-uxl-dot": "1" }), text];
+      const num = numByUid.get(n.uid) || null;
+      const children = isPageHint
+        ? [text]
+        : [
+            el("span", { class: "uxl-hint-dot", "data-uxl-dot": "1" }),
+            el("span", { class: "uxl-hint-badge uxl-hint-badge--list", text: String(num ?? "") }),
+            text,
+          ];
       const li = el(
         "li",
         { class: isPageHint ? "uxl-hints__item uxl-hints__item--page" : "uxl-hints__item", "data-uxl-uid": n.uid },
         children,
       );
       list.append(li);
+    }
+
+    // Mobile mode: show numbered badges on elements (instead of hint lines).
+    const badgeLayer = el("div", { class: "uxl-hint-badges", "aria-hidden": "true" });
+    canvas.append(badgeLayer);
+    const badgeByUid = new Map(); // uid -> badgeEl
+
+    function updateMobileHintBadges() {
+      const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+      const mobile = vw <= 900;
+      badgeLayer.style.display = mobile ? "block" : "none";
+      if (!mobile) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const baseW = ast.window?.w || canvas.offsetWidth || 1;
+      const scale = Math.max(0.0001, canvasRect.width / baseW);
+
+      const badgeR = 9; // px (half of 18px badge)
+      for (let idx = 0; idx < elementHints.length; idx++) {
+        const n = elementHints[idx];
+        const target = domByUid.get(n.uid);
+        const num = numByUid.get(n.uid);
+        if (!target || !num) continue;
+
+        const tRect = target.getBoundingClientRect();
+        // Anchor near the right edge (where desktop callout circle lands), with small deterministic vertical spread.
+        const spread = (idx - (elementHints.length - 1) / 2) * 8;
+        const x = (tRect.right - canvasRect.left) / scale - badgeR;
+        const y = (tRect.top + tRect.height / 2 - canvasRect.top) / scale + spread;
+
+        let badge = badgeByUid.get(n.uid) || null;
+        if (!badge) {
+          badge = el("div", { class: "uxl-hint-badge uxl-hint-badge--on-element" });
+          badgeByUid.set(n.uid, badge);
+          badgeLayer.append(badge);
+        }
+        badge.textContent = String(num);
+        badge.style.left = `${Math.round(x)}px`;
+        badge.style.top = `${Math.round(y)}px`;
+      }
     }
 
     function redrawHintLines() {
@@ -1920,6 +1973,19 @@
     requestAnimationFrame(() => redrawHintLines());
     window.addEventListener("resize", () => requestAnimationFrame(() => redrawHintLines()));
     canvas.addEventListener("scroll", () => requestAnimationFrame(() => redrawHintLines()));
+
+    // Mobile badges: keep in sync with layout/scroll.
+    requestAnimationFrame(() => updateMobileHintBadges());
+    window.addEventListener("resize", () => requestAnimationFrame(() => updateMobileHintBadges()));
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", () => requestAnimationFrame(() => updateMobileHintBadges()));
+    // Capture scroll events from any scrollable descendant (scroll doesn't bubble, but it does capture).
+    body.addEventListener(
+      "scroll",
+      () => {
+        requestAnimationFrame(() => updateMobileHintBadges());
+      },
+      true,
+    );
 
     return page;
   }

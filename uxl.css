@@ -275,6 +275,12 @@
     display: flex;
     justify-content: center;
   }
+  .uxl-hint-dot {
+    display: none;
+  }
+  .uxl-hint-badge {
+    display: inline-block;
+  }
 }
 
 .uxl-hints {
@@ -305,6 +311,31 @@
   border-radius: 50%;
   background: var(--uxl-hint);
   flex: 0 0 auto;
+}
+
+.uxl-hint-badge {
+  display: none; /* enabled on mobile */
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--uxl-hint);
+  color: #ffffff;
+  font: 12px/18px ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.uxl-hint-badges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.uxl-hint-badge--on-element {
+  position: absolute;
+  transform: translate(0, -50%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, #000000 25%, transparent);
 }
 
 .uxl-hint-text {
