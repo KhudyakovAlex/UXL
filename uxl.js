@@ -1556,8 +1556,8 @@
       for (const uid of pagesInOrder) {
         const elp = pageEls.get(uid);
         if (!elp) continue;
-        const r = elp.getBoundingClientRect();
-        sizes.set(uid, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+        // Use offset sizes to ignore any CSS transforms (mobile scaling).
+        sizes.set(uid, { w: Math.ceil(elp.offsetWidth), h: Math.ceil(elp.offsetHeight) });
       }
 
       const colGap = 80;
@@ -1607,10 +1607,12 @@
       clearSvgKeepDefs(overlay);
       ensureArrowMarker(overlay, arrowId);
 
-      const gridRect = grid.getBoundingClientRect();
-      overlay.setAttribute("viewBox", `0 0 ${Math.round(gridRect.width)} ${Math.round(gridRect.height)}`);
-      overlay.setAttribute("width", String(Math.round(gridRect.width)));
-      overlay.setAttribute("height", String(Math.round(gridRect.height)));
+      // IMPORTANT: Use untransformed sizes/coords so arrows remain correct under CSS scaling.
+      const baseW = Math.round(grid.offsetWidth);
+      const baseH = Math.round(grid.offsetHeight);
+      overlay.setAttribute("viewBox", `0 0 ${baseW} ${baseH}`);
+      overlay.setAttribute("width", String(baseW));
+      overlay.setAttribute("height", String(baseH));
 
       // Merge bidirectional transitions: A<->B is drawn as a single connection with arrows on both ends.
       // Also dedupe multiple A->B (already deduped in ast.edges).
@@ -1636,18 +1638,20 @@
       }
 
       function rectRel(el) {
-        const r = el.getBoundingClientRect();
-        const left = r.left - gridRect.left;
-        const top = r.top - gridRect.top;
+        // Pages are positioned absolutely inside `grid`, so offsetLeft/Top are in the same coord space.
+        const left = el.offsetLeft;
+        const top = el.offsetTop;
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
         return {
           left,
           top,
-          right: left + r.width,
-          bottom: top + r.height,
-          midX: left + r.width / 2,
-          midY: top + r.height / 2,
-          w: r.width,
-          h: r.height,
+          right: left + w,
+          bottom: top + h,
+          midX: left + w / 2,
+          midY: top + h / 2,
+          w,
+          h,
         };
       }
 
@@ -1788,6 +1792,7 @@
       if (!mobile) {
         canvasScale.style.transform = "";
         canvasScale.style.transformOrigin = "";
+        canvasScale.style.width = "";
         canvasScale.style.height = "";
         return;
       }
@@ -1799,6 +1804,8 @@
       const scale = Math.max(0.1, Math.min(1, availW / ast.window.w));
       canvasScale.style.transformOrigin = "top left";
       canvasScale.style.transform = `scale(${scale})`;
+      // Ensure the scaled wrapper contributes correct layout size (prevents horizontal scroll).
+      canvasScale.style.width = `${Math.round(ast.window.w * scale)}px`;
       canvasScale.style.height = `${Math.round(ast.window.h * scale)}px`;
     }
 

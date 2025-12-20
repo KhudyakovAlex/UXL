@@ -10,6 +10,7 @@
 
   color: var(--uxl-text);
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 .uxl-toolbar {
@@ -269,8 +270,10 @@
     display: none;
   }
   .uxl-canvas-wrap {
-    overflow: visible;
+    overflow: hidden;
     width: 100%;
+    display: flex;
+    justify-content: center;
   }
 }
 
