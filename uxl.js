@@ -1450,6 +1450,8 @@
 
   function renderMap(ast) {
     const map = el("div", { class: "uxl-map" });
+    const mapWrap = el("div", { class: "uxl-map-wrap" });
+    const mapScale = el("div", { class: "uxl-map-scale" });
     const grid = el("div", { class: "uxl-map__grid" });
     const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     overlay.classList.add("uxl-overlay", "uxl-overlay--map");
@@ -1483,7 +1485,9 @@
 
     // Put overlay inside the grid so it shares the same coordinate space and size (like hint callouts).
     grid.append(overlay);
-    map.append(grid);
+    mapScale.append(grid);
+    mapWrap.append(mapScale);
+    map.append(mapWrap);
 
     function clearSvgKeepDefs(svg) {
       const defs = svg.querySelector("defs");
@@ -1713,11 +1717,40 @@
       requestAnimationFrame(() => {
         layoutAsTree();
         redraw();
+        applyMapScaleToFitWidth();
       });
+    }
+
+    function applyMapScaleToFitWidth() {
+      const vv = window.visualViewport;
+      const vw = vv ? vv.width : window.innerWidth;
+      const mobile = vw <= 900;
+
+      if (!mobile) {
+        mapScale.style.transform = "";
+        mapScale.style.transformOrigin = "";
+        mapScale.style.width = "";
+        mapScale.style.height = "";
+        return;
+      }
+
+      // Scale down only (never upscale) so the map fits the available width.
+      const availW = mapWrap.clientWidth || map.getBoundingClientRect().width || vw;
+      const baseW = grid.offsetWidth || 1; // offsetWidth ignores transform; good for baseline
+      const baseH = grid.offsetHeight || 1;
+      const pad = 8;
+      const scale = Math.max(0.1, Math.min(1, (availW - pad * 2) / baseW));
+
+      mapScale.style.transformOrigin = "top left";
+      mapScale.style.transform = `scale(${scale})`;
+      // Make the wrapper's layout size match the transformed size to avoid extra overflow/blank space.
+      mapScale.style.width = `${Math.round(baseW * scale)}px`;
+      mapScale.style.height = `${Math.round(baseH * scale)}px`;
     }
 
     relayoutAndRedraw();
     window.addEventListener("resize", () => relayoutAndRedraw());
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", () => relayoutAndRedraw());
 
     return map;
   }

@@ -106,6 +106,17 @@
 .uxl-map {
   position: relative;
   margin-bottom: 14px;
+  max-width: 100%;
+}
+
+.uxl-map-wrap {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.uxl-map-scale {
+  width: fit-content;
+  display: inline-block;
 }
 
 .uxl-map__title {
