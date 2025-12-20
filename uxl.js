@@ -1996,11 +1996,12 @@
     const key = `uxl-proto:${Date.now()}:${Math.random().toString(16).slice(2)}`;
     const lastKey = "uxl-proto:last";
     const payload = { uxlText: String(uxlText || ""), mode, view: view === "fullscreen" ? "fullscreen" : "1:1" };
+    // Store one-shot key (for backwards compatibility) + "last" (main path).
     localStorage.setItem(key, JSON.stringify(payload));
-    // Also store "last" so installed PWA can open a stable URL and still render the latest prototype.
+    // Store "last" so prototype can open a stable URL and still render the latest content.
     localStorage.setItem(lastKey, JSON.stringify(payload));
-    // Open the app-like page (better mobile experience). It will load from "uxl-proto:last".
-    window.open(`./prototype_app.html`, "_blank");
+    // Open prototype in a new tab. It will load from "uxl-proto:last".
+    window.open(`./prototype.html`, "_blank");
   }
 
   function renderPrototypeFromStorageKeyOrLast(key) {

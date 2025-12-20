@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#ffffff"/>
-  <rect x="64" y="96" width="384" height="320" rx="24" fill="#f6f8fa" stroke="#8c959f" stroke-width="12"/>
-  <text x="256" y="292" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial" font-size="120" font-weight="700" fill="#24292f">UXL</text>
-</svg>
-
-

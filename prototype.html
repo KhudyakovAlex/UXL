@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>UXL prototype</title>
-    <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./uxl.css" />
     <style>
       body {
@@ -25,10 +24,7 @@
       (() => {
         const params = new URLSearchParams(location.search);
         const key = params.get("key");
-        if (!key) {
-          document.body.textContent = "UXL prototype: missing ?key=...";
-          return;
-        }
+        // Prefer explicit one-shot key if provided, otherwise render the latest prototype from localStorage ("uxl-proto:last").
         window.UXL.renderPrototypeFromStorageKeyOrLast(key);
       })();
     </script>
