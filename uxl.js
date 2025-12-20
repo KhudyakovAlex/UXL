@@ -1992,12 +1992,13 @@
     return page;
   }
 
-  function openPrototypeForText(uxlText, { mode = "permissive" } = {}) {
+  function openPrototypeForText(uxlText, { mode = "permissive", view = "1:1" } = {}) {
     const key = `uxl-proto:${Date.now()}:${Math.random().toString(16).slice(2)}`;
     const lastKey = "uxl-proto:last";
-    localStorage.setItem(key, JSON.stringify({ uxlText: String(uxlText || ""), mode }));
+    const payload = { uxlText: String(uxlText || ""), mode, view: view === "fullscreen" ? "fullscreen" : "1:1" };
+    localStorage.setItem(key, JSON.stringify(payload));
     // Also store "last" so installed PWA can open a stable URL and still render the latest prototype.
-    localStorage.setItem(lastKey, JSON.stringify({ uxlText: String(uxlText || ""), mode }));
+    localStorage.setItem(lastKey, JSON.stringify(payload));
     // Open the app-like page (better mobile experience). It will load from "uxl-proto:last".
     window.open(`./prototype_app.html`, "_blank");
   }
@@ -2021,6 +2022,7 @@
     }
     const uxlText = String(payload.uxlText || "");
     const mode = payload.mode === "strict" ? "strict" : "permissive";
+    const view = payload.view === "fullscreen" ? "fullscreen" : "1:1";
 
     let ast;
     try {
@@ -2034,11 +2036,14 @@
     document.body.style.background = "#2b2b2b";
     document.body.style.margin = "0";
 
-    const root = el("div", { class: "uxl-root uxl-proto-root" });
+    const root = el("div", {
+      class: view === "fullscreen" ? "uxl-root uxl-proto-root uxl-proto-root--fullscreen" : "uxl-root uxl-proto-root",
+    });
     const frame = el("div", { class: "uxl-proto-frame" });
     const canvas = el("div", { class: "uxl-canvas" });
-    canvas.style.width = `${ast.window.w}px`;
-    canvas.style.height = `${ast.window.h}px`;
+    const win = view === "fullscreen" ? getViewportWindowSize({ pad: 0 }) : ast.window;
+    canvas.style.width = `${win.w}px`;
+    canvas.style.height = `${win.h}px`;
     frame.append(canvas);
     root.append(frame);
     document.body.replaceChildren(root);
@@ -2052,7 +2057,7 @@
       document.title = pageLabel(pageNode);
 
       canvas.replaceChildren();
-      layoutTree(canvas, pageNode, ast.window);
+      layoutTree(canvas, pageNode, win);
 
       // wire goto: switch pages inside prototype
       const buttons = Array.from(canvas.querySelectorAll('button.uxl-B[data-uxl-uid]'));
@@ -2088,13 +2093,14 @@
       const pad = 8;
       const availW = Math.max(0, vw - pad * 2);
       const availH = Math.max(0, vh - pad * 2);
-      const baseW = ast.window.w;
-      const baseH = ast.window.h;
-      // Allow upscaling on mobile only; on desktop keep scale <= 1 to avoid scrollbars.
+      const baseW = win.w;
+      const baseH = win.h;
+      // For Full Screen mode we never upscale (canvas already matches viewport).
+      // For 1:1 we allow upscaling on mobile only; on desktop keep scale <= 1 to avoid scrollbars.
       const isMobileLike =
         ("ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0) &&
         Math.min(vw, vh) <= 900;
-      const maxScale = isMobileLike ? 4 : 1;
+      const maxScale = view === "fullscreen" ? 1 : isMobileLike ? 4 : 1;
       const scale = Math.max(0.1, Math.min(maxScale, availW / baseW, availH / baseH));
 
       frame.style.transformOrigin = "center center";
@@ -2109,11 +2115,10 @@
     renderCurrent();
   }
 
-  function getViewportWindowSize() {
+  function getViewportWindowSize({ pad = 16 } = {}) {
     const vv = window.visualViewport;
     const vw = vv ? vv.width : window.innerWidth;
     const vh = vv ? vv.height : window.innerHeight;
-    const pad = 16;
     return {
       w: Math.max(240, Math.floor(vw - pad)),
       h: Math.max(240, Math.floor(vh - pad)),
@@ -2122,37 +2127,18 @@
 
   function renderAst(ast, { uxlText = "", mode = "permissive" } = {}) {
     const root = el("div", { class: "uxl-root" });
+    root.append(el("div", { class: "uxl-map__title", text: "Превью прототипа" }));
     const toolbar = el("div", { class: "uxl-toolbar" });
-    const protoBtn = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Открыть прототип" });
-    protoBtn.addEventListener("click", () => openPrototypeForText(uxlText, { mode }));
-    toolbar.append(protoBtn);
-
-    const viewModeKey = "uxl:viewMode";
-    const savedViewMode = localStorage.getItem(viewModeKey);
-    const viewMode = savedViewMode === "fullscreen" ? "fullscreen" : "1:1";
-
-    const btn11 = el("button", { class: "uxl-toolbar__btn", type: "button", text: "1:1" });
-    const btnFs = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Full Screen" });
-    btn11.setAttribute("aria-pressed", viewMode === "1:1" ? "true" : "false");
-    btnFs.setAttribute("aria-pressed", viewMode === "fullscreen" ? "true" : "false");
-    if (viewMode === "1:1") btn11.classList.add("uxl-toolbar__btn--active");
-    if (viewMode === "fullscreen") btnFs.classList.add("uxl-toolbar__btn--active");
-
-    function rerenderWith(nextMode) {
-      localStorage.setItem(viewModeKey, nextMode);
-      const here = root;
-      const next = renderAst(ast, { uxlText, mode });
-      here.replaceWith(next);
-    }
-    btn11.addEventListener("click", () => rerenderWith("1:1"));
-    btnFs.addEventListener("click", () => rerenderWith("fullscreen"));
-    toolbar.append(btn11, btnFs);
+    const protoBtn11 = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Открыть прототип 1:1" });
+    protoBtn11.addEventListener("click", () => openPrototypeForText(uxlText, { mode, view: "1:1" }));
+    const protoBtnFs = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Full Screen" });
+    protoBtnFs.addEventListener("click", () => openPrototypeForText(uxlText, { mode, view: "fullscreen" }));
+    toolbar.append(protoBtn11, protoBtnFs);
     root.append(toolbar);
     root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });
-    const windowOverride = viewMode === "fullscreen" ? getViewportWindowSize() : null;
-    for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p, { windowOverride }));
+    for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p));
     root.append(pagesWrap);
 
     const footer = el("div", { class: "uxl-footer" });
