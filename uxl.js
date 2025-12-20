@@ -1897,8 +1897,9 @@
     function updateMobileHintBadges() {
       const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
       const mobile = vw <= 900;
-      badgeLayer.style.display = mobile ? "block" : "none";
-      if (!mobile) return;
+      // Mobile request: hide element hint badges entirely (keep only page hint text in the list).
+      badgeLayer.style.display = "none";
+      if (mobile) return;
 
       const canvasRect = canvas.getBoundingClientRect();
       const baseW = ast.window?.w || canvas.offsetWidth || 1;

@@ -275,11 +275,14 @@
     display: flex;
     justify-content: center;
   }
-  .uxl-hint-dot {
+  /* Mobile: show only the page hint, hide element hints and any dots/badges */
+  .uxl-hints__item:not(.uxl-hints__item--page) {
     display: none;
   }
-  .uxl-hint-badge {
-    display: inline-block;
+  .uxl-hint-dot,
+  .uxl-hint-badge,
+  .uxl-hint-badges {
+    display: none !important;
   }
 }
 
