@@ -2032,16 +2032,23 @@
       return;
     }
 
-    // Prototype page background (around the window)
+    // Prototype page styles
     document.body.style.background = view === "fullscreen" ? "#ffffff" : "#2b2b2b";
     document.body.style.margin = "0";
+    document.body.style.overflow = "hidden";
+    document.body.style.width = "100vw";
+    document.body.style.height = "100dvh";
+    // Override inline styles in prototype*.html (they set body as a flex container).
+    document.body.style.display = view === "fullscreen" ? "block" : "flex";
+    document.body.style.alignItems = view === "fullscreen" ? "" : "center";
+    document.body.style.justifyContent = view === "fullscreen" ? "" : "center";
 
     const root = el("div", {
       class: view === "fullscreen" ? "uxl-root uxl-proto-root uxl-proto-root--fullscreen" : "uxl-root uxl-proto-root",
     });
     const frame = el("div", { class: "uxl-proto-frame" });
     const canvas = el("div", { class: "uxl-canvas" });
-    const win = view === "fullscreen" ? getViewportWindowSize({ pad: 0 }) : ast.window;
+    let win = view === "fullscreen" ? getViewportWindowSize({ pad: 0 }) : ast.window;
     canvas.style.width = `${win.w}px`;
     canvas.style.height = `${win.h}px`;
     frame.append(canvas);
@@ -2050,6 +2057,20 @@
 
     const pageByUid = new Map(ast.pages.map((p) => [p.uid, p]));
     let currentUid = ast.pages[0]?.uid || null;
+    let lastWinW = win.w;
+    let lastWinH = win.h;
+
+    function refreshFullscreenWindowIfNeeded() {
+      if (view !== "fullscreen") return;
+      const next = getViewportWindowSize({ pad: 0 });
+      if (next.w === lastWinW && next.h === lastWinH) return;
+      win = next;
+      lastWinW = next.w;
+      lastWinH = next.h;
+      canvas.style.width = `${win.w}px`;
+      canvas.style.height = `${win.h}px`;
+      renderCurrent();
+    }
 
     function renderCurrent() {
       const pageNode = currentUid ? pageByUid.get(currentUid) : null;
@@ -2084,6 +2105,12 @@
     }
 
     function applyScaleToFit() {
+      if (view === "fullscreen") {
+        // No scaling/padding in fullscreen: canvas already matches the viewport size.
+        frame.style.transformOrigin = "";
+        frame.style.transform = "";
+        return;
+      }
       // Scale the whole "window" to fit viewport without overflowing.
       const vv = window.visualViewport;
       const vw = vv ? vv.width : window.innerWidth;
@@ -2109,8 +2136,16 @@
 
     // Recompute scale on viewport changes (Android address bar/orientation).
     applyScaleToFit();
-    window.addEventListener("resize", applyScaleToFit);
-    if (window.visualViewport) window.visualViewport.addEventListener("resize", applyScaleToFit);
+    window.addEventListener("resize", () => {
+      refreshFullscreenWindowIfNeeded();
+      applyScaleToFit();
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", () => {
+        refreshFullscreenWindowIfNeeded();
+        applyScaleToFit();
+      });
+    }
 
     renderCurrent();
   }

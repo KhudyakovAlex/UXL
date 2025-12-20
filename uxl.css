@@ -60,6 +60,11 @@
 
 .uxl-proto-root--fullscreen {
   padding: 0;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 .uxl-proto-root--fullscreen .uxl-canvas {
@@ -71,6 +76,11 @@
 .uxl-proto-frame {
   position: relative;
   width: fit-content;
+}
+
+.uxl-proto-root--fullscreen .uxl-proto-frame {
+  width: 100%;
+  height: 100%;
 }
 
 .uxl-proto-back {
