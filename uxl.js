@@ -2000,8 +2000,56 @@
     localStorage.setItem(key, JSON.stringify(payload));
     // Store "last" so prototype can open a stable URL and still render the latest content.
     localStorage.setItem(lastKey, JSON.stringify(payload));
-    // Open prototype in a new tab. It will load from "uxl-proto:last".
-    window.open(`./prototype.html`, "_blank");
+
+    function getBaseHref() {
+      // Directory of current document, with trailing slash.
+      const url = new URL(window.location.href);
+      url.hash = "";
+      url.search = "";
+      url.pathname = url.pathname.replace(/[^/]*$/, "");
+      return url.toString();
+    }
+
+    // Open prototype in a new tab WITHOUT requiring a separate prototype.html file.
+    const w = window.open("", "_blank");
+    if (!w) {
+      alert("Не удалось открыть новую вкладку (возможно, заблокировано браузером). Разрешите pop-up и попробуйте снова.");
+      return;
+    }
+
+    const base = getBaseHref();
+    const doc = w.document;
+    doc.open();
+    doc.write(`<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>UXL prototype</title>
+    <base href="${base}">
+    <link rel="stylesheet" href="./uxl.css" />
+    <style>
+      body {
+        margin: 0;
+        background: #2b2b2b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        width: 100vw;
+        height: 100dvh;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="./uxl.js"></script>
+    <script>
+      // Render latest prototype from localStorage ("uxl-proto:last")
+      window.UXL.renderPrototypeFromStorageKeyOrLast(null);
+    </script>
+  </body>
+</html>`);
+    doc.close();
   }
 
   function renderPrototypeFromStorageKeyOrLast(key) {
