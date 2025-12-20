@@ -36,6 +36,15 @@
   font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
+.uxl-footer {
+  margin-top: 14px;
+}
+
+.uxl-footer__ver {
+  color: var(--uxl-muted);
+  font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
 .uxl-proto-root {
   display: flex;
   align-items: center;

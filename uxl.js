@@ -2113,15 +2113,18 @@
     const toolbar = el("div", { class: "uxl-toolbar" });
     const protoBtn = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Открыть прототип" });
     protoBtn.addEventListener("click", () => openPrototypeForText(uxlText, { mode }));
-    const ver = el("div", { class: "uxl-toolbar__ver", text: `UXL ${ast.uxlVersion || SUPPORTED_UXL_VERSION} / renderer ${RENDERER_VERSION}` });
     toolbar.append(protoBtn);
-    toolbar.append(ver);
     root.append(toolbar);
     root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });
     for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p));
     root.append(pagesWrap);
+
+    const footer = el("div", { class: "uxl-footer" });
+    const ver = el("div", { class: "uxl-footer__ver", text: `UXL ${ast.uxlVersion || SUPPORTED_UXL_VERSION} / renderer ${RENDERER_VERSION}` });
+    footer.append(ver);
+    root.append(footer);
     return root;
   }
 
