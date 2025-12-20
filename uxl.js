@@ -7,6 +7,9 @@
 (() => {
   "use strict";
 
+  const RENDERER_VERSION = "0.2.0";
+  const SUPPORTED_UXL_VERSION = "1.0";
+
   class UxlParseError extends Error {
     constructor(message, { line = null, col = null, sourceName = "UXL", lineText = null } = {}) {
       super(message);
@@ -155,6 +158,21 @@
       if (t.startsWith('"')) return unescapeQuotedField(t, meta);
       return t;
     });
+  }
+
+  function parseUxlVersionIfPresent(lines, startIndex, sourceName) {
+    // First significant line may be a version header: UXL:1.0
+    for (let i = startIndex; i < lines.length; i++) {
+      const rawLine = lines[i];
+      if (isBlankOrComment(rawLine)) continue;
+      const meta = { line: i + 1, col: 1, sourceName, lineText: rawLine };
+      assertNoTabs(rawLine, meta);
+      const s = rawLine.trim();
+      const m = /^UXL\s*:\s*([0-9]+(?:\.[0-9]+){1,2})$/i.exec(s);
+      if (!m) return { version: null, nextIndex: i };
+      return { version: m[1], nextIndex: i + 1 };
+    }
+    return { version: null, nextIndex: lines.length };
   }
 
   function parseWindowSizeIfPresent(lines, startIndex, sourceName, mode) {
@@ -576,7 +594,15 @@
 
   function parseUxl(uxlText, { mode = "permissive", sourceName = "UXL" } = {}) {
     const lines = String(uxlText).replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
-    const { size: windowSize, nextIndex } = parseWindowSizeIfPresent(lines, 0, sourceName, mode);
+    const { version: uxlVersionRaw, nextIndex: afterVersion } = parseUxlVersionIfPresent(lines, 0, sourceName);
+    if (uxlVersionRaw && uxlVersionRaw !== SUPPORTED_UXL_VERSION) {
+      throw new UxlParseError(
+        `Неподдерживаемая версия UXL: "${uxlVersionRaw}". Поддерживается: "${SUPPORTED_UXL_VERSION}".`,
+        { line: null, col: null, sourceName, lineText: null },
+      );
+    }
+    const uxlVersion = uxlVersionRaw || SUPPORTED_UXL_VERSION;
+    const { size: windowSize, nextIndex } = parseWindowSizeIfPresent(lines, afterVersion, sourceName, mode);
 
     const stack = []; // {indent, node}
     const roots = [];
@@ -616,12 +642,15 @@
     // Validate structure + build pages list
     for (const r of roots) {
       if (r.tag !== "P") {
-        throw new UxlParseError("В корне UXL-блока разрешены только теги P (после опциональной строки размера окна вида 600x600).", {
+        throw new UxlParseError(
+          "В корне UXL-блока разрешены только теги P (после опциональной строки версии UXL:1.0 и размера окна вида 600x600).",
+          {
           line: r.rawLineNo,
           col: 1,
           sourceName,
           lineText: lines[r.rawLineNo - 1],
-        });
+          },
+        );
       }
     }
 
@@ -671,7 +700,7 @@
       const kids = node.children || [];
 
       if (tag !== "P" && node.parent == null) {
-        throw new UxlParseError("В корне разрешены только P (после опциональной строки размера окна вида 600x600).", {
+        throw new UxlParseError("В корне разрешены только P (после опциональной строки версии UXL:1.0 и размера окна вида 600x600).", {
           line: node.rawLineNo,
           col: 1,
           sourceName,
@@ -861,6 +890,7 @@
       kind: "UXL",
       mode,
       sourceName,
+      uxlVersion,
       window: windowSize,
       pages,
       edges: Array.from(edges.values()),
@@ -1827,8 +1857,112 @@
     return page;
   }
 
-  function renderAst(ast) {
+  function openPrototypeForText(uxlText, { mode = "permissive" } = {}) {
+    const key = `uxl-proto:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+    const lastKey = "uxl-proto:last";
+    localStorage.setItem(key, JSON.stringify({ uxlText: String(uxlText || ""), mode }));
+    // Also store "last" so installed PWA can open a stable URL and still render the latest prototype.
+    localStorage.setItem(lastKey, JSON.stringify({ uxlText: String(uxlText || ""), mode }));
+    window.open(`./prototype.html?key=${encodeURIComponent(key)}`, "_blank");
+  }
+
+  function renderPrototypeFromStorageKeyOrLast(key) {
+    const lastKey = "uxl-proto:last";
+    const effectiveKey = key || lastKey;
+    const raw = localStorage.getItem(effectiveKey);
+    if (!raw) {
+      document.body.textContent = "UXL prototype: нет сохранённого прототипа (откройте «Открыть прототип» в основном рендере).";
+      return;
+    }
+    // one-shot only for explicit keys; keep "last"
+    if (key) localStorage.removeItem(key);
+
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = { uxlText: raw, mode: "permissive" };
+    }
+    const uxlText = String(payload.uxlText || "");
+    const mode = payload.mode === "strict" ? "strict" : "permissive";
+
+    let ast;
+    try {
+      ast = parseUxl(uxlText, { mode, sourceName: "UXL prototype" });
+    } catch (e) {
+      document.body.replaceChildren(renderError(e instanceof UxlParseError ? e : new UxlParseError(String(e), { sourceName: "UXL prototype" })));
+      return;
+    }
+
+    // Clean white page + centered window
+    document.body.style.background = "#ffffff";
+    document.body.style.margin = "0";
+
+    const root = el("div", { class: "uxl-root uxl-proto-root" });
+    const frame = el("div", { class: "uxl-proto-frame" });
+    const backBtn = el("button", { class: "uxl-proto-back", type: "button", text: "← Назад" });
+    const canvas = el("div", { class: "uxl-canvas" });
+    canvas.style.width = `${ast.window.w}px`;
+    canvas.style.height = `${ast.window.h}px`;
+    frame.append(backBtn, canvas);
+    root.append(frame);
+    document.body.replaceChildren(root);
+
+    const pageByUid = new Map(ast.pages.map((p) => [p.uid, p]));
+    const history = [];
+    let currentUid = ast.pages[0]?.uid || null;
+
+    function renderCurrent() {
+      const pageNode = currentUid ? pageByUid.get(currentUid) : null;
+      if (!pageNode) return;
+      document.title = pageLabel(pageNode);
+
+      canvas.replaceChildren();
+      layoutTree(canvas, pageNode, ast.window);
+
+      // wire goto: switch pages inside prototype
+      const buttons = Array.from(canvas.querySelectorAll('button.uxl-B[data-uxl-uid]'));
+      for (const btn of buttons) {
+        const uid = btn.getAttribute("data-uxl-uid");
+        if (!uid) continue;
+        const node = ast.nodeByUid?.get(uid) || null;
+        if (!node || !node.action || node.action.type !== "GOTO") continue;
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const targetId = String(node.action.target || "").trim();
+          const targetKey = normalizeId(targetId);
+          const targetUid = ast.pageIdToUid?.[targetKey] || null;
+          if (!targetUid) {
+            alert(`UXL: страница для GOTO не найдена: "${targetId}"`);
+            return;
+          }
+          history.push(currentUid);
+          currentUid = targetUid;
+          renderCurrent();
+        });
+      }
+
+      backBtn.disabled = history.length === 0;
+    }
+
+    backBtn.addEventListener("click", () => {
+      if (history.length === 0) return;
+      currentUid = history.pop();
+      renderCurrent();
+    });
+
+    renderCurrent();
+  }
+
+  function renderAst(ast, { uxlText = "", mode = "permissive" } = {}) {
     const root = el("div", { class: "uxl-root" });
+    const toolbar = el("div", { class: "uxl-toolbar" });
+    const protoBtn = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Открыть прототип" });
+    protoBtn.addEventListener("click", () => openPrototypeForText(uxlText, { mode }));
+    const ver = el("div", { class: "uxl-toolbar__ver", text: `UXL ${ast.uxlVersion || SUPPORTED_UXL_VERSION} / renderer ${RENDERER_VERSION}` });
+    toolbar.append(protoBtn);
+    toolbar.append(ver);
+    root.append(toolbar);
     root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });
@@ -1840,7 +1974,7 @@
   function renderUxlText(uxlText, opts = {}) {
     try {
       const ast = parseUxl(uxlText, opts);
-      return renderAst(ast);
+      return renderAst(ast, { uxlText, mode: opts.mode || "permissive" });
     } catch (e) {
       if (e instanceof UxlParseError) return renderError(e);
       const err = new UxlParseError(e?.message || String(e), { sourceName: opts.sourceName || "UXL" });
@@ -1867,10 +2001,14 @@
 
   window.UXL = {
     UxlParseError,
+    VERSION: RENDERER_VERSION,
+    SUPPORTED_UXL_VERSION,
     parse: parseUxl,
     renderUxlText,
     renderAll,
     extractUxlBlocksFromMarkdown,
+    openPrototypeForText,
+    renderPrototypeFromStorageKeyOrLast,
   };
 })();
 

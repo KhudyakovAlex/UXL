@@ -12,6 +12,58 @@
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 
+.uxl-toolbar {
+  display: inline-flex;
+  gap: 8px;
+  margin: 0 0 10px;
+  align-items: center;
+}
+
+.uxl-toolbar__btn {
+  padding: 6px 10px;
+  border: 1px solid var(--uxl-border);
+  background: var(--uxl-bg);
+  cursor: pointer;
+}
+
+.uxl-toolbar__btn:hover {
+  border-color: color-mix(in srgb, var(--uxl-accent) 40%, var(--uxl-border));
+}
+
+.uxl-toolbar__ver {
+  color: var(--uxl-muted);
+  font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+.uxl-proto-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.uxl-proto-frame {
+  position: relative;
+  width: fit-content;
+}
+
+.uxl-proto-back {
+  position: absolute;
+  top: -42px;
+  left: 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--uxl-muted);
+  font: inherit;
+  text-decoration: none;
+}
+
+.uxl-proto-back:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .uxl-root * {
   box-sizing: border-box;
   border-radius: 0;
