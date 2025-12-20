@@ -1955,8 +1955,11 @@
       const availH = Math.max(0, vh - pad * 2);
       const baseW = ast.window.w;
       const baseH = ast.window.h;
-      // Allow upscaling so prototype is максимально крупно на телефоне.
-      const maxScale = 4;
+      // Allow upscaling on mobile only; on desktop keep scale <= 1 to avoid scrollbars.
+      const isMobileLike =
+        ("ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0) &&
+        Math.min(vw, vh) <= 900;
+      const maxScale = isMobileLike ? 4 : 1;
       const scale = Math.max(0.1, Math.min(maxScale, availW / baseW, availH / baseH));
 
       frame.style.transformOrigin = "center center";
