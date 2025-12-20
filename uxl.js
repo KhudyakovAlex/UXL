@@ -1863,7 +1863,8 @@
     localStorage.setItem(key, JSON.stringify({ uxlText: String(uxlText || ""), mode }));
     // Also store "last" so installed PWA can open a stable URL and still render the latest prototype.
     localStorage.setItem(lastKey, JSON.stringify({ uxlText: String(uxlText || ""), mode }));
-    window.open(`./prototype.html?key=${encodeURIComponent(key)}`, "_blank");
+    // Open the app-like page (better mobile experience). It will load from "uxl-proto:last".
+    window.open(`./prototype_app.html`, "_blank");
   }
 
   function renderPrototypeFromStorageKeyOrLast(key) {
@@ -1950,6 +1951,31 @@
       currentUid = history.pop();
       renderCurrent();
     });
+
+    function applyScaleToFit() {
+      // Scale the whole "window" to fit viewport without overflowing.
+      const vv = window.visualViewport;
+      const vw = vv ? vv.width : window.innerWidth;
+      const vh = vv ? vv.height : window.innerHeight;
+
+      // Leave tiny breathing room + room for the back link above the canvas.
+      const pad = 8;
+      const backH = 44;
+
+      const availW = Math.max(0, vw - pad * 2);
+      const availH = Math.max(0, vh - pad * 2 - backH);
+      const baseW = ast.window.w;
+      const baseH = ast.window.h;
+      const scale = Math.max(0.1, Math.min(1, availW / baseW, availH / baseH));
+
+      frame.style.transformOrigin = "center center";
+      frame.style.transform = `scale(${scale})`;
+    }
+
+    // Recompute scale on viewport changes (Android address bar/orientation).
+    applyScaleToFit();
+    window.addEventListener("resize", applyScaleToFit);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", applyScaleToFit);
 
     renderCurrent();
   }
