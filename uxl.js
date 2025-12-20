@@ -2033,7 +2033,7 @@
     }
 
     // Prototype page background (around the window)
-    document.body.style.background = "#2b2b2b";
+    document.body.style.background = view === "fullscreen" ? "#ffffff" : "#2b2b2b";
     document.body.style.margin = "0";
 
     const root = el("div", {
@@ -2129,7 +2129,7 @@
     const root = el("div", { class: "uxl-root" });
     root.append(el("div", { class: "uxl-map__title", text: "Превью прототипа" }));
     const toolbar = el("div", { class: "uxl-toolbar" });
-    const protoBtn11 = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Открыть прототип 1:1" });
+    const protoBtn11 = el("button", { class: "uxl-toolbar__btn", type: "button", text: "1:1" });
     protoBtn11.addEventListener("click", () => openPrototypeForText(uxlText, { mode, view: "1:1" }));
     const protoBtnFs = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Full Screen" });
     protoBtnFs.addEventListener("click", () => openPrototypeForText(uxlText, { mode, view: "fullscreen" }));
