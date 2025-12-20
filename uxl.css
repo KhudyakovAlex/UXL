@@ -144,22 +144,49 @@
   font-weight: 800;
 }
 
+@keyframes uxl-goto-title {
+  0% { color: inherit; }
+  15% { color: var(--uxl-hint); }
+  85% { color: var(--uxl-hint); }
+  100% { color: inherit; }
+}
+
+@keyframes uxl-goto-canvas {
+  0% { border-color: var(--uxl-border); box-shadow: none; }
+  15% { border-color: var(--uxl-hint); box-shadow: 0 0 0 2px color-mix(in srgb, var(--uxl-hint) 35%, transparent); }
+  85% { border-color: var(--uxl-hint); box-shadow: 0 0 0 2px color-mix(in srgb, var(--uxl-hint) 35%, transparent); }
+  100% { border-color: var(--uxl-border); box-shadow: none; }
+}
+
+.uxl-page--goto .uxl-page__head {
+  /* Title: color only (no border/outline) */
+  animation: uxl-goto-title 2.2s ease-out;
+}
+
+.uxl-page--goto .uxl-canvas {
+  /* Canvas: border highlight */
+  animation: uxl-goto-canvas 2.2s ease-out;
+}
+
 .uxl-page__body {
   display: grid;
-  grid-template-columns: minmax(360px, 1fr) minmax(260px, 360px);
-  gap: 12px;
+  /* Keep hints close to the canvas: do not stretch the left column to full width */
+  grid-template-columns: max-content minmax(220px, 320px);
+  gap: 10px;
   position: relative;
 }
 
 .uxl-canvas-wrap {
   overflow: auto;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .uxl-canvas {
   position: relative;
   background: var(--uxl-panel);
   border: 1px solid var(--uxl-border);
-  overflow: hidden;
+  overflow: auto; /* P scrolls by default; can be overridden to hidden/scroll by inline styles */
 }
 
 .uxl-hints {
@@ -199,6 +226,12 @@
 /* Rendered elements */
 .uxl-node {
   position: absolute;
+}
+
+.uxl-F {
+  border: 0;
+  background: transparent;
+  /* F is a layout container only (invisible), but exists in DOM for crop/scroll behavior. */
 }
 
 .uxl-T {
@@ -241,8 +274,9 @@
 }
 
 .uxl-T th {
-  background: color-mix(in srgb, var(--uxl-panel) 70%, var(--uxl-bg));
-  font-weight: 800;
+  background: color-mix(in srgb, var(--uxl-panel) 88%, var(--uxl-border));
+  color: var(--uxl-muted);
+  font-weight: 500;
 }
 
 

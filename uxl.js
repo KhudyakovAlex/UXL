@@ -27,6 +27,30 @@
       .replaceAll("'", "&#39;");
   }
 
+  function getScrollbarThicknessPx() {
+    // Measure once per page; scrollbar width/height is usually the same.
+    // This is used so scrollbars do not "eat" the working area: we expand the outer box instead.
+    const outer = document.createElement("div");
+    outer.style.position = "absolute";
+    outer.style.top = "-9999px";
+    outer.style.left = "-9999px";
+    outer.style.width = "100px";
+    outer.style.height = "100px";
+    outer.style.overflow = "scroll";
+    outer.style.border = "0";
+    outer.style.padding = "0";
+    outer.style.visibility = "hidden";
+    const inner = document.createElement("div");
+    inner.style.width = "100%";
+    inner.style.height = "100%";
+    outer.append(inner);
+    document.body.append(outer);
+    const w = outer.offsetWidth - outer.clientWidth;
+    const h = outer.offsetHeight - outer.clientHeight;
+    outer.remove();
+    return { w: Math.max(0, w), h: Math.max(0, h) };
+  }
+
   function isBlankOrComment(rawLine) {
     const trimmed = rawLine.trim();
     if (!trimmed) return true;
@@ -133,42 +157,72 @@
     });
   }
 
-  function parseWindowSizeIfPresent(lines, startIndex, sourceName) {
-    // Find first significant line, attempt to parse WxH (integers >0). If not present, default 500x500.
+  function parseWindowSizeIfPresent(lines, startIndex, sourceName, mode) {
+    // Find first significant line, attempt to parse WxH (integers >0), with optional overflow suffix per axis.
+    // Axis syntax: number [C|S]  (window size is always px; '%' is forbidden here)
+    // If not present, default 500x500.
     for (let i = startIndex; i < lines.length; i++) {
       const rawLine = lines[i];
       if (isBlankOrComment(rawLine)) continue;
       const meta = { line: i + 1, col: 1, sourceName, lineText: rawLine };
       assertNoTabs(rawLine, meta);
       const s = rawLine.trim();
-      const m = /^(\d+)\s*x\s*(\d+)$/.exec(s);
-      if (!m) return { size: { w: 500, h: 500 }, nextIndex: i };
+      const m = /^(\d+)([CS])?\s*[xX]\s*(\d+)([CS])?$/i.exec(s);
+      if (!m) return { size: { w: 500, h: 500, overflowW: null, overflowH: null }, nextIndex: i };
       const w = Number(m[1]);
-      const h = Number(m[2]);
+      const overflowW = m[2] ? (String(m[2]).toUpperCase() === "C" ? "crop" : "scroll") : null;
+      const h = Number(m[3]);
+      const overflowH = m[4] ? (String(m[4]).toUpperCase() === "C" ? "crop" : "scroll") : null;
       if (!Number.isInteger(w) || !Number.isInteger(h) || w <= 0 || h <= 0) {
         throw new UxlParseError("Некорректный размер окна (ожидается W>0, H>0, целые).", meta);
       }
-      return { size: { w, h }, nextIndex: i + 1 };
+      if (mode === "strict") {
+        // Guard against invalid combos (e.g. both C and S). Regex already prevents it; keep for clarity.
+      }
+      return { size: { w, h, overflowW, overflowH }, nextIndex: i + 1 };
     }
-    return { size: { w: 500, h: 500 }, nextIndex: lines.length };
+    return { size: { w: 500, h: 500, overflowW: null, overflowH: null }, nextIndex: lines.length };
   }
 
-  function parseDim(raw, meta) {
+  function parseDim(raw, meta, { allowPercent = true, allowOverflow = true } = {}) {
+    // Axis syntax: number[%][C|S]
+    // Overflow suffix requires explicit number (no "Cx").
     if (raw == null || raw === "") return null;
     if (raw.toLowerCase().includes("px")) {
       throw new UxlParseError('Суффикс "px" запрещен. Пиксели задаются числом без суффикса.', meta);
     }
-    if (raw.endsWith("%")) {
-      const n = raw.slice(0, -1);
+    const s = String(raw).trim();
+    if (!s) return null;
+
+    // Extract overflow suffix (C/S) if present.
+    let overflow = null;
+    let core = s;
+    if (allowOverflow) {
+      const last = core.slice(-1).toUpperCase();
+      if (last === "C" || last === "S") {
+        overflow = last === "C" ? "crop" : "scroll";
+        core = core.slice(0, -1);
+      }
+    }
+
+    // Overflow suffix requires explicit number; "Cx" is handled earlier at SIZE-level, but keep guard here.
+    if (overflow && (!core || core === "%")) {
+      throw new UxlParseError("crop/scroll требует явного числа по оси (например 100C или 30%S).", meta);
+    }
+
+    if (core.endsWith("%")) {
+      if (!allowPercent) throw new UxlParseError("Проценты здесь запрещены.", meta);
+      const n = core.slice(0, -1);
       if (!/^\d+$/.test(n)) throw new UxlParseError("Проценты должны быть целым числом (например 33%).", meta);
       const v = Number(n);
       if (!Number.isInteger(v) || v < 0 || v > 100) throw new UxlParseError("Проценты должны быть в диапазоне 0..100%.", meta);
-      return { unit: "%", value: v };
+      return { unit: "%", value: v, overflow };
     }
-    if (!/^\d+$/.test(raw)) throw new UxlParseError("Пиксели должны быть целым числом без суффикса.", meta);
-    const v = Number(raw);
+
+    if (!/^\d+$/.test(core)) throw new UxlParseError("Пиксели должны быть целым числом без суффикса.", meta);
+    const v = Number(core);
     if (!Number.isInteger(v) || v < 0) throw new UxlParseError("Пиксели должны быть целым числом >= 0.", meta);
-    return { unit: "px", value: v };
+    return { unit: "px", value: v, overflow };
   }
 
   function parseSize(sizeStr, meta) {
@@ -178,14 +232,23 @@
     if (idx === -1) throw new UxlParseError('SIZE должен быть в формате "WxH" (допустимы частичные Wx / xH).', meta);
     const wRaw = sizeStr.slice(0, idx);
     const hRaw = sizeStr.slice(idx + 1);
-    return { w: parseDim(wRaw, meta), h: parseDim(hRaw, meta) };
+    // Guard: "Cx100" / "Sx100" etc are invalid (overflow requires explicit number)
+    if (/^[CS]$/i.test(wRaw.trim())) throw new UxlParseError("crop/scroll требует явного числа по ширине (например 100C).", meta);
+    if (/^[CS]$/i.test(hRaw.trim())) throw new UxlParseError("crop/scroll требует явного числа по высоте (например 100S).", meta);
+    return { w: parseDim(wRaw, meta, { allowPercent: true, allowOverflow: true }), h: parseDim(hRaw, meta, { allowPercent: true, allowOverflow: true }) };
   }
 
   function parseAlign(alignStr, meta) {
     const s = (alignStr || "").trim().toUpperCase();
-    if (!s) return { L: false, R: false, T: false, B: false };
+    if (!s) return { h: null, v: null };
     if (!/^[LRTB]+$/.test(s)) throw new UxlParseError("ALIGN может содержать только символы L, R, T, B.", meta);
-    return { L: s.includes("L"), R: s.includes("R"), T: s.includes("T"), B: s.includes("B") };
+    const hasL = s.includes("L");
+    const hasR = s.includes("R");
+    const hasT = s.includes("T");
+    const hasB = s.includes("B");
+    if (hasL && hasR) throw new UxlParseError("ALIGN: комбинация LR запрещена.", meta);
+    if (hasT && hasB) throw new UxlParseError("ALIGN: комбинация TB запрещена.", meta);
+    return { h: hasL ? "L" : hasR ? "R" : null, v: hasT ? "T" : hasB ? "B" : null };
   }
 
   function normalizeId(id) {
@@ -225,55 +288,242 @@
     const tag = (fields[0] || "").trim().toUpperCase();
     if (!tag) throw new UxlParseError("Пустой TAG.", meta);
 
-    // default format: TAG\ID\CAPTION\SIZE\ALIGN\ACTION\HINT
     const get = (idx) => (fields[idx] == null ? "" : fields[idx]);
 
-    if (tag === "P") {
-      const id = get(1);
-      const caption = get(2);
-      if (!id) throw new UxlParseError("Для тега P поле ID обязательно.", meta);
-      const extra = fields.slice(3).some((x) => (x || "").trim() !== "");
-      if (extra && mode === "strict") {
-        throw new UxlParseError("Тег P допускает только формат P\\ID\\CAPTION. Лишние поля запрещены.", meta);
+    function tagFormatHelp(t) {
+      switch (t) {
+        case "P":
+          return {
+            format: "P\\CAPTION[\\HINT] или P\\ID\\CAPTION[\\HINT]",
+            example: "P\\users\\Пользователи\\Подсказка страницы",
+          };
+        case "F":
+          return { format: "F\\[SIZE/ALIGN/ACTION/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\Контейнер" };
+        case "B":
+          return { format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/HINT...] (поля в любом порядке)", example: "B\\Кнопка\\100x\\RB\\GOTO:users\\Назад" };
+        case "C":
+          return { format: "C\\CAPTION\\[SIZE/ALIGN/ACTION/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\Подсказка" };
+        case "T":
+          return { format: "T\\COLS:...\\[SIZE/ALIGN/HINT...] (поля в любом порядке)", example: "T\\COLS:20R,80L\\100%x100%\\T\\Таблица" };
+        case "TH":
+          return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
+        case "TD":
+          return { format: "TD\\C\\C\\...", example: "TD\\1\\Алексей\\Админ" };
+        default:
+          return { format: "см. UXL.md", example: "" };
       }
-      return { indent, node: { tag, id, caption, size: null, align: null, action: null, hint: null, rawLineNo: lineNo } };
     }
 
-    if (tag === "TC") {
-      const cols = fields.slice(1).map((cell) => cell);
-      if (cols.length === 0) throw new UxlParseError("TC должен содержать хотя бы одну колонку.", meta);
-      return { indent, node: { tag, cols, rawLineNo: lineNo } };
+    function formatError(t, details) {
+      const h = tagFormatHelp(t);
+      const extra = details ? ` ${details}` : "";
+      const ex = h.example ? ` Пример: ${h.example}` : "";
+      return new UxlParseError(`Неверный формат тега ${t}.${extra} Ожидается: ${h.format}.${ex}`, meta);
+    }
+
+    function parseCommon({ caption = "", sizeStr = "", alignStr = "", actionStr = "", hint = "" } = {}) {
+      const size = sizeStr ? parseSize(sizeStr, meta) : null;
+      const align = alignStr ? parseAlign(alignStr, meta) : null;
+      const action = actionStr ? parseAction(actionStr, meta, mode) : null;
+      return { caption: caption || "", size, align, action, hint: hint || "" };
+    }
+
+    function isSizeToken(s) {
+      const v = String(s || "").trim();
+      // SIZE always has an 'x' separator (partial forms also include x).
+      return v.includes("x") || v.includes("X");
+    }
+
+    function isAlignToken(s) {
+      const v = String(s || "").trim().toUpperCase();
+      if (!v) return false;
+      if (!/^[LRTB]+$/.test(v)) return false;
+      // LR and TB are forbidden
+      if (v.includes("L") && v.includes("R")) return false;
+      if (v.includes("T") && v.includes("B")) return false;
+      return true;
+    }
+
+    function isActionToken(s) {
+      const v = String(s || "").trim().toUpperCase();
+      return v.startsWith("GOTO:") || v.startsWith("GOTO:P");
+    }
+
+    function isColsToken(s) {
+      const v = String(s || "").trim().toUpperCase();
+      return v.startsWith("COLS:");
+    }
+
+    function parseUnorderedFields(
+      tokens,
+      { allowSize = true, allowAlign = true, allowAction = true, allowHint = true, allowCols = false } = {},
+    ) {
+      let sizeStr = "";
+      let alignStr = "";
+      let actionStr = "";
+      let hint = "";
+      let colsSpec = "";
+
+      const setOnce = (kind, val) => {
+        if (kind === "size") {
+          if (sizeStr) throw formatError(tag, "SIZE указан более одного раза.");
+          sizeStr = val;
+          return;
+        }
+        if (kind === "align") {
+          if (alignStr) throw formatError(tag, "ALIGN указан более одного раза.");
+          alignStr = val;
+          return;
+        }
+        if (kind === "action") {
+          if (actionStr) throw formatError(tag, "ACTION указан более одного раза.");
+          actionStr = val;
+          return;
+        }
+        if (kind === "cols") {
+          if (colsSpec) throw formatError(tag, "COLS указан более одного раза.");
+          colsSpec = val;
+          return;
+        }
+        if (kind === "hint") {
+          if (hint) throw formatError(tag, "HINT указан более одного раза.");
+          hint = val;
+          return;
+        }
+      };
+
+      for (const raw of tokens) {
+        const v = String(raw ?? "").trim();
+        if (!v) continue;
+        if (allowCols && isColsToken(v)) {
+          setOnce("cols", v);
+          continue;
+        }
+        if (allowAction && isActionToken(v)) {
+          setOnce("action", v);
+          continue;
+        }
+        if (allowSize && isSizeToken(v)) {
+          setOnce("size", v);
+          continue;
+        }
+        if (allowAlign && isAlignToken(v)) {
+          setOnce("align", v);
+          continue;
+        }
+        if (allowHint) {
+          setOnce("hint", v);
+          continue;
+        }
+        throw formatError(tag, `Не удалось распознать поле "${v}".`);
+      }
+      return { sizeStr, alignStr, actionStr, hint, colsSpec };
+    }
+
+    if (tag === "P") {
+      // P supports both forms:
+      // - P\CAPTION[\HINT]
+      // - P\ID\CAPTION[\HINT]  (ID must match [A-Za-z0-9_-]+)
+      // If there are 3 fields and the 2nd does not look like an ID, it's treated as CAPTION and the 3rd as HINT.
+      let id = "";
+      let caption = "";
+      let hint = "";
+
+      const idRe = /^[A-Za-z0-9_-]+$/;
+
+      if (fields.length >= 5) {
+        if (mode === "strict") throw formatError("P", "Слишком много полей.");
+        // permissive: ignore extras
+      }
+
+      if (fields.length === 4) {
+        // Either P\ID\CAPTION\HINT or P\CAPTION\HINT\(extra ignored)
+        const f1 = get(1);
+        if (idRe.test(String(f1).trim())) {
+          id = f1;
+          caption = get(2);
+          hint = get(3);
+        } else {
+          caption = f1;
+          hint = get(2);
+        }
+      } else if (fields.length === 3) {
+        const f1 = get(1);
+        if (idRe.test(String(f1).trim())) {
+          id = f1;
+          caption = get(2);
+        } else {
+          caption = f1;
+          hint = get(2);
+        }
+      } else if (fields.length === 2) {
+        caption = get(1);
+      } else if (fields.length === 1) {
+        // P without caption is allowed (renders as "P" or "P <ID>" if ID exists).
+      }
+
+      return { indent, node: { tag, id, caption, size: null, align: null, action: null, hint: hint || "", rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
       const cells = fields.slice(1);
+      if (cells.length === 0) throw formatError(tag, "Должна быть хотя бы одна ячейка.");
       return { indent, node: { tag, cells, rawLineNo: lineNo } };
     }
 
-    const id = get(1);
-    const caption = get(2);
-    const sizeStr = get(3);
-    const alignStr = get(4);
-    const actionStr = get(5);
-    const hint = get(6);
+    // Per-tag formats (ID is not used anywhere except P):
+    // B: B\CAPTION[\SIZE][\ALIGN][\ACTION][\HINT]
+    // C: C\CAPTION[\SIZE][\ALIGN][\HINT]  (ACTION not used, but accepted/ignored in permissive via parseAction)
+    // F: F[\SIZE][\ALIGN][\HINT]
+    // T: T[\SIZE][\ALIGN][\HINT] (ACTION is not supported; handled by structure validation)
 
-    const size = sizeStr ? parseSize(sizeStr, meta) : null;
-    const align = alignStr ? parseAlign(alignStr, meta) : null;
-    const action = actionStr ? parseAction(actionStr, meta, mode) : null;
+    if (tag === "B") {
+      const caption = get(1);
+      if (!String(caption).trim()) throw formatError("B", "CAPTION обязателен.");
+      const rest = parseUnorderedFields(fields.slice(2), { allowSize: true, allowAlign: true, allowAction: true, allowHint: true });
+      const sizeStr = rest.sizeStr;
+      const alignStr = rest.alignStr;
+      const actionStr = rest.actionStr;
+      const hint = rest.hint;
+      const common = parseCommon({ caption, sizeStr, alignStr, actionStr, hint });
+      return { indent, node: { tag, id: "", ...common, rawLineNo: lineNo } };
+    }
 
-    return {
-      indent,
-      node: {
-        tag,
-        id: id || "",
-        caption: caption || "",
-        size,
-        align,
-        action,
-        hint: hint || "",
-        rawLineNo: lineNo,
-      },
-    };
+    if (tag === "C") {
+      const caption = get(1);
+      if (!String(caption).trim()) throw formatError("C", "CAPTION обязателен.");
+      const rest = parseUnorderedFields(fields.slice(2), { allowSize: true, allowAlign: true, allowAction: true, allowHint: true });
+      const sizeStr = rest.sizeStr;
+      const alignStr = rest.alignStr;
+      const actionStr = rest.actionStr;
+      const hint = rest.hint;
+      const common = parseCommon({ caption, sizeStr, alignStr, actionStr, hint });
+      // C ACTION is not meaningful; strict/permissive behavior is enforced in parseAction.
+      return { indent, node: { tag, id: "", ...common, rawLineNo: lineNo } };
+    }
+
+    if (tag === "F") {
+      const rest = parseUnorderedFields(fields.slice(1), { allowSize: true, allowAlign: true, allowAction: false, allowHint: true });
+      const sizeStr = rest.sizeStr;
+      const alignStr = rest.alignStr;
+      const hint = rest.hint;
+      const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
+      return { indent, node: { tag, id: "", ...common, rawLineNo: lineNo } };
+    }
+
+    if (tag === "T") {
+      const rest = parseUnorderedFields(fields.slice(1), { allowSize: true, allowAlign: true, allowAction: true, allowHint: true, allowCols: true });
+      const sizeStr = rest.sizeStr;
+      const alignStr = rest.alignStr;
+      const hint = rest.hint;
+      const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: rest.actionStr, hint });
+      return { indent, node: { tag, id: "", colsSpec: rest.colsSpec || "", ...common, rawLineNo: lineNo } };
+    }
+
+    throw new UxlParseError(
+      `Неизвестный тег: "${tag}". Разрешены: P, F, B, C, T, TH, TD. См. UXL.md для форматов.`,
+      meta,
+    );
   }
 
   function validateTcFormat(tcNode, meta) {
@@ -312,9 +562,21 @@
     return cols;
   }
 
+  function parseColsSpec(colsSpecRaw, meta) {
+    const raw = String(colsSpecRaw || "").trim();
+    if (!raw) throw new UxlParseError("Для таблицы T обязателен COLS:... (описание колонок).", meta);
+    const m = /^COLS:(.+)$/i.exec(raw);
+    if (!m) throw new UxlParseError('Некорректный формат COLS (ожидается "COLS:20R,80L").', meta);
+    const body = m[1].trim();
+    if (!body) throw new UxlParseError('Пустой COLS (ожидается "COLS:20R,80L").', meta);
+    const parts = body.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) throw new UxlParseError('COLS должен содержать хотя бы одну колонку (например "COLS:100").', meta);
+    return parts;
+  }
+
   function parseUxl(uxlText, { mode = "permissive", sourceName = "UXL" } = {}) {
     const lines = String(uxlText).replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
-    const { size: windowSize, nextIndex } = parseWindowSizeIfPresent(lines, 0, sourceName);
+    const { size: windowSize, nextIndex } = parseWindowSizeIfPresent(lines, 0, sourceName, mode);
 
     const stack = []; // {indent, node}
     const roots = [];
@@ -354,7 +616,7 @@
     // Validate structure + build pages list
     for (const r of roots) {
       if (r.tag !== "P") {
-        throw new UxlParseError("В корне UXL-блока разрешены только теги P.", {
+        throw new UxlParseError("В корне UXL-блока разрешены только теги P (после опциональной строки размера окна вида 600x600).", {
           line: r.rawLineNo,
           col: 1,
           sourceName,
@@ -363,23 +625,8 @@
       }
     }
 
-    // ID uniqueness by tag type (case-insensitive)
-    const idsByTag = new Map(); // tag -> Set(lowerId)
-    function registerId(tag, id, rawLineNo) {
-      const norm = normalizeId(id);
-      if (!norm) return;
-      if (!idsByTag.has(tag)) idsByTag.set(tag, new Set());
-      const set = idsByTag.get(tag);
-      if (set.has(norm)) {
-        throw new UxlParseError(`Дублирующийся ID "${id}" для тега ${tag} (case-insensitive).`, {
-          line: rawLineNo,
-          col: 1,
-          sourceName,
-          lineText: lines[rawLineNo - 1],
-        });
-      }
-      set.add(norm);
-    }
+    // ID uniqueness only matters for P (used by GOTO).
+    const pageIds = new Set(); // lowerId
 
     const pages = [];
     const pagesById = new Map(); // lower -> page
@@ -390,37 +637,28 @@
 
       // Validate ID charset for nodes that have ID provided
       if (node.tag === "P") {
-        if (!/^[A-Za-z0-9_-]+$/.test(node.id)) {
+        if (node.id) {
+          if (!/^[A-Za-z0-9_-]+$/.test(node.id)) {
           throw new UxlParseError("Некорректный ID у P (разрешены латиница/цифры/_/-).", {
             line: node.rawLineNo,
             col: 1,
             sourceName,
             lineText: lines[node.rawLineNo - 1],
           });
+          }
+          const key = normalizeId(node.id);
+          if (pageIds.has(key)) {
+            throw new UxlParseError(`Дублирующийся ID страницы "${node.id}" (case-insensitive).`, {
+              line: node.rawLineNo,
+              col: 1,
+              sourceName,
+              lineText: lines[node.rawLineNo - 1],
+            });
+          }
+          pageIds.add(key);
+          pagesById.set(key, node);
         }
-        registerId("P", node.id, node.rawLineNo);
-        const key = normalizeId(node.id);
-        if (pagesById.has(key)) {
-          // already caught by registerId, but keep safe
-          throw new UxlParseError(`Дублирующийся ID страницы "${node.id}".`, {
-            line: node.rawLineNo,
-            col: 1,
-            sourceName,
-            lineText: lines[node.rawLineNo - 1],
-          });
-        }
-        pagesById.set(key, node);
         pages.push(node);
-      } else if (node.id) {
-        if (!/^[A-Za-z0-9_-]+$/.test(node.id)) {
-          throw new UxlParseError("Некорректный ID (разрешены латиница/цифры/_/-).", {
-            line: node.rawLineNo,
-            col: 1,
-            sourceName,
-            lineText: lines[node.rawLineNo - 1],
-          });
-        }
-        registerId(node.tag, node.id, node.rawLineNo);
       }
 
       for (const ch of node.children) walk(ch, node);
@@ -433,7 +671,7 @@
       const kids = node.children || [];
 
       if (tag !== "P" && node.parent == null) {
-        throw new UxlParseError("В корне разрешены только P.", {
+        throw new UxlParseError("В корне разрешены только P (после опциональной строки размера окна вида 600x600).", {
           line: node.rawLineNo,
           col: 1,
           sourceName,
@@ -472,7 +710,7 @@
         }
       } else if (tag === "T") {
         for (const ch of kids) {
-          if (!["TC", "TH", "TD"].includes(ch.tag)) {
+          if (!["TH", "TD"].includes(ch.tag)) {
             throw new UxlParseError(`Недопустимый дочерний тег "${ch.tag}" внутри T.`, {
               line: ch.rawLineNo,
               col: 1,
@@ -480,16 +718,6 @@
               lineText: lines[ch.rawLineNo - 1],
             });
           }
-        }
-        // order: TC (required), then TH (0/1), then TD (0..)
-        const tcIdx = kids.findIndex((k) => k.tag === "TC");
-        if (tcIdx !== 0) {
-          throw new UxlParseError("Внутри T первым должен идти TC (обязателен).", {
-            line: node.rawLineNo,
-            col: 1,
-            sourceName,
-            lineText: lines[node.rawLineNo - 1],
-          });
         }
         const thCount = kids.filter((k) => k.tag === "TH").length;
         if (thCount > 1) {
@@ -521,7 +749,7 @@
           });
         }
         if (node.action && mode !== "strict") node.action = null; // permissive ignore
-      } else if (["B", "C", "TC", "TH", "TD"].includes(tag)) {
+      } else if (["B", "C", "TH", "TD"].includes(tag)) {
         if (kids.length) {
           throw new UxlParseError(`${tag} не может иметь дочерних элементов.`, {
             line: node.rawLineNo,
@@ -539,14 +767,6 @@
         });
       }
 
-      // validate sizes/align for generic nodes
-      if (node.size && node.size.w) parseDim(node.size.w.unit === "%" ? `${node.size.w.value}%` : `${node.size.w.value}`, {
-        line: node.rawLineNo,
-        col: 1,
-        sourceName,
-        lineText: lines[node.rawLineNo - 1],
-      });
-
       for (const ch of kids) validateNode(ch);
     }
     for (const p of pages) validateNode(p);
@@ -555,14 +775,14 @@
     function validateTables(node) {
       if (node.tag === "T") {
         const kids = node.children || [];
-        const tc = kids.find((k) => k.tag === "TC");
-        const meta = { line: tc.rawLineNo, col: 1, sourceName, lineText: lines[tc.rawLineNo - 1] };
-        const cols = validateTcFormat(tc, meta);
+        const meta = { line: node.rawLineNo, col: 1, sourceName, lineText: lines[node.rawLineNo - 1] };
+        const colsRaw = parseColsSpec(node.colsSpec, meta);
+        const cols = validateTcFormat({ cols: colsRaw }, meta);
         node._tcCols = cols;
         const colCount = cols.length;
         const th = kids.find((k) => k.tag === "TH");
         if (th && th.cells.length !== colCount) {
-          throw new UxlParseError(`Количество ячеек в TH (${th.cells.length}) не равно количеству колонок TC (${colCount}).`, {
+          throw new UxlParseError(`Количество ячеек в TH (${th.cells.length}) не равно количеству колонок (${colCount}).`, {
             line: th.rawLineNo,
             col: 1,
             sourceName,
@@ -571,7 +791,7 @@
         }
         for (const td of kids.filter((k) => k.tag === "TD")) {
           if (td.cells.length !== colCount) {
-            throw new UxlParseError(`Количество ячеек в TD (${td.cells.length}) не равно количеству колонок TC (${colCount}).`, {
+            throw new UxlParseError(`Количество ячеек в TD (${td.cells.length}) не равно количеству колонок (${colCount}).`, {
               line: td.rawLineNo,
               col: 1,
               sourceName,
@@ -629,6 +849,14 @@
     }
     for (const p of pages) assignUid(p);
 
+    // Build uid -> node map (useful for wiring events in renderer)
+    const nodeByUid = new Map();
+    function indexByUid(node) {
+      nodeByUid.set(node.uid, node);
+      for (const ch of node.children || []) indexByUid(ch);
+    }
+    for (const p of pages) indexByUid(p);
+
     return {
       kind: "UXL",
       mode,
@@ -636,6 +864,12 @@
       window: windowSize,
       pages,
       edges: Array.from(edges.values()),
+      pageIdToUid: (() => {
+        const m = Object.create(null);
+        for (const [k, p] of pagesById.entries()) m[k] = p.uid;
+        return m;
+      })(),
+      nodeByUid,
       _lines: lines,
     };
   }
@@ -678,6 +912,14 @@
     return lines.map(escapeHtml).join("<br>");
   }
 
+  function pageLabel(pageNode) {
+    const cap = String(pageNode.caption || "").trim();
+    if (cap) return cap;
+    const id = String(pageNode.id || "").trim();
+    if (id) return `P ${id}`;
+    return "P";
+  }
+
   function renderError(err) {
     const root = el("div", { class: "uxl-root" });
     const head = el("div", { class: "uxl-error__head", text: "UXL error" });
@@ -701,43 +943,23 @@
     return null;
   }
 
-  function computeRect({ parentW, parentH, size, align, isContainer }) {
-    // width/height
-    const a = align || { L: false, R: false, T: false, B: false };
-    const stretchX = a.L && a.R;
-    const stretchY = a.T && a.B;
-
-    let w = size?.w ? resolveDim(size.w, parentW) : null;
-    let h = size?.h ? resolveDim(size.h, parentH) : null;
-
-    if (w == null && stretchX) w = parentW;
-    if (h == null && stretchY) h = parentH;
-
-    // Heuristic for containers without explicit size: occupy parent space so children can be positioned.
-    if (isContainer) {
-      if (w == null) w = parentW;
-      if (h == null) h = parentH;
-    }
-
-    // x/y (center by default)
-    const x = stretchX ? 0 : a.L ? 0 : a.R ? Math.max(0, parentW - w) : Math.max(0, (parentW - w) / 2);
-    const y = stretchY ? 0 : a.T ? 0 : a.B ? Math.max(0, parentH - h) : Math.max(0, (parentH - h) / 2);
-
-    return { x, y, w, h };
-  }
-
   function layoutTree(containerEl, rootNode, windowSize) {
     // rootNode is P; containerEl is .uxl-canvas
+    // IMPORTANT: layout relies on measuring intrinsic sizes, so it must run after the subtree is attached to DOM.
     const domByUid = new Map();
 
     function renderNode(node, parentEl) {
       const tag = node.tag;
       let nodeEl;
 
-      // F is invisible: used only for layout, not rendered as a DOM element.
       if (tag === "F") {
-        for (const ch of node.children || []) renderNode(ch, parentEl);
-        return null;
+        // F is invisible visually, but it must exist as a DOM container to support crop/scroll.
+        nodeEl = el("div", { class: "uxl-node uxl-F", "data-uxl-uid": node.uid });
+        if (node.hint) nodeEl.title = node.hint;
+        domByUid.set(node.uid, nodeEl);
+        parentEl.append(nodeEl);
+        for (const ch of node.children || []) renderNode(ch, nodeEl);
+        return nodeEl;
       }
 
       if (tag === "C") nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
@@ -784,104 +1006,328 @@
       domByUid.set(node.uid, nodeEl);
       parentEl.append(nodeEl);
 
-      // No nested rendering needed: T children are structural; F is invisible and handled above.
+      // No nested rendering needed: T children are structural; F is handled above.
       return nodeEl;
     }
 
     // Render children of P
     for (const ch of rootNode.children || []) renderNode(ch, containerEl);
 
-    // Layout pass (top-down)
-    function applyLayout(node, parentRect, offset) {
-      const tag = node.tag;
-      const isContainer = tag === "F" || tag === "T";
-      const size = node.size || null;
-      const align = node.align || null;
-      const rect = computeRect({ parentW: parentRect.w, parentH: parentRect.h, size, align, isContainer });
-
-      const nodeEl = domByUid.get(node.uid);
-      if (nodeEl) {
-        nodeEl.style.left = `${offset.x + rect.x}px`;
-        nodeEl.style.top = `${offset.y + rect.y}px`;
-        if (rect.w != null) nodeEl.style.width = `${rect.w}px`;
-        if (rect.h != null) nodeEl.style.height = `${rect.h}px`;
-      }
-
-      if (tag === "F") {
-        // F is an invisible container: children coords are relative to its rect, but rendered in the same canvas.
-        const nextOffset = { x: offset.x + rect.x, y: offset.y + rect.y };
-        layoutChildren(node.children || [], rect, nextOffset);
-      }
-      // T has no UI children beyond its table; B/C have no children by validation.
+    function setOverflowStyles(nodeEl, dimW, dimH) {
+      const ox = dimW?.overflow || null;
+      const oy = dimH?.overflow || null;
+      if (ox === "crop") nodeEl.style.overflowX = "hidden";
+      else if (ox === "scroll") nodeEl.style.overflowX = "auto";
+      else nodeEl.style.overflowX = "";
+      if (oy === "crop") nodeEl.style.overflowY = "hidden";
+      else if (oy === "scroll") nodeEl.style.overflowY = "auto";
+      else nodeEl.style.overflowY = "";
     }
 
-    function resolveNodeSizePx(node, parentW, parentH) {
-      const a = node.align || { L: false, R: false, T: false, B: false };
-      const stretchX = a.L && a.R;
-      const stretchY = a.T && a.B;
+    function measureIntrinsic(node) {
+      const nodeEl = domByUid.get(node.uid);
+      if (!nodeEl) return { w: 0, h: 0 };
+      // Measure current rendered box (without forcing). This is our intrinsic size baseline.
+      const r = nodeEl.getBoundingClientRect();
+      return { w: Math.ceil(r.width), h: Math.ceil(r.height) };
+    }
 
-      const w = node.size?.w ? resolveDim(node.size.w, parentW) : stretchX ? parentW : null;
-      const h = node.size?.h ? resolveDim(node.size.h, parentH) : stretchY ? parentH : null;
+    function resolveBaseSize(node, parentW, parentH) {
+      const w = node.size?.w ? resolveDim(node.size.w, parentW) : null;
+      const h = node.size?.h ? resolveDim(node.size.h, parentH) : null;
       return { w, h };
     }
 
-    function computeEdgeReserves(children, parentW, parentH) {
-      let left = 0;
-      let right = 0;
-      let top = 0;
-      let bottom = 0;
-
-      for (const ch of children) {
-        const a = ch.align || { L: false, R: false, T: false, B: false };
-        const sz = resolveNodeSizePx(ch, parentW, parentH);
-
-        // Reserve only for edge-anchored, non-stretch in that axis.
-        if (a.L && !a.R && sz.w != null) left = Math.max(left, sz.w);
-        if (a.R && !a.L && sz.w != null) right = Math.max(right, sz.w);
-        if (a.T && !a.B && sz.h != null) top = Math.max(top, sz.h);
-        if (a.B && !a.T && sz.h != null) bottom = Math.max(bottom, sz.h);
-      }
-
-      const w = Math.max(0, parentW - left - right);
-      const h = Math.max(0, parentH - top - bottom);
-      return { left, right, top, bottom, content: { x: left, y: top, w, h } };
+    function alignToXY({ hAlign, vAlign, parentW, parentH, w, h }) {
+      const x = hAlign === "L" ? 0 : hAlign === "R" ? Math.max(0, parentW - w) : Math.max(0, Math.round((parentW - w) / 2));
+      const y = vAlign === "T" ? 0 : vAlign === "B" ? Math.max(0, parentH - h) : Math.max(0, Math.round((parentH - h) / 2));
+      return { x, y };
     }
 
-    function layoutChildren(children, parentRect, parentOffset) {
-      if (!children || children.length === 0) return;
+    function isContainerTag(tag) {
+      return tag === "P" || tag === "F";
+    }
 
-      // Reserve edges based on explicit sizes of edge-anchored siblings.
-      const reserves = computeEdgeReserves(children, parentRect.w, parentRect.h);
-      const c = reserves.content;
+    function layoutContainer(node, containerDomEl, parentW, parentH, { root = false } = {}) {
+      // Determine current container base size (as minimum) from its SIZE, otherwise from provided (root) or from children.
+      const base = root ? { w: parentW, h: parentH } : resolveBaseSize(node, parentW, parentH);
+      let cw = base.w ?? 0;
+      let ch = base.h ?? 0;
 
-      for (const ch of children) {
-        const a = ch.align || { L: false, R: false, T: false, B: false };
-        const stretchX = a.L && a.R;
-        const stretchY = a.T && a.B;
-        const centerX = !a.L && !a.R;
-        const centerY = !a.T && !a.B;
+      // Prepare overflow styles (crop/scroll) for this container element.
+      if (root) {
+        // For root canvas (P), if content exceeds bounds it must scroll by default.
+        // Suffixes on window size can override: C=crop, S=scroll.
+        const wDim = { overflow: windowSize.overflowW || "scroll" };
+        const hDim = { overflow: windowSize.overflowH || "scroll" };
+        setOverflowStyles(containerDomEl, wDim, hDim);
+      } else {
+        setOverflowStyles(containerDomEl, node.size?.w || null, node.size?.h || null);
+      }
 
-        // For stretch/centered items, constrain available area to the remaining content box,
-        // so they "bump" into edge-anchored siblings instead of overlapping them.
-        const useContentX = stretchX || centerX;
-        const useContentY = stretchY || centerY;
+      const kids = node.children || [];
+      if (kids.length === 0) {
+        // If no children, size is either explicit, or intrinsic from DOM (rare for F), else 0.
+        const intrinsic = root ? { w: cw, h: ch } : measureIntrinsic(node);
+        const ow = node.size?.w?.overflow || null;
+        const oh = node.size?.h?.overflow || null;
+        const wFinal = node.size?.w ? (ow ? cw : Math.max(cw, intrinsic.w)) : intrinsic.w;
+        const hFinal = node.size?.h ? (oh ? ch : Math.max(ch, intrinsic.h)) : intrinsic.h;
+        return { w: wFinal, h: hFinal };
+      }
 
-        const availX = useContentX ? c.x : 0;
-        const availY = useContentY ? c.y : 0;
-        const availW = useContentX ? c.w : parentRect.w;
-        const availH = useContentY ? c.h : parentRect.h;
+      // Split children into vertical bands by vAlign: T / (center) / B
+      const top = [];
+      const mid = [];
+      const bottom = [];
+      for (const chNode of kids) {
+        const v = chNode.align?.v || null;
+        if (v === "T") top.push(chNode);
+        else if (v === "B") bottom.push(chNode);
+        else mid.push(chNode);
+      }
 
-        applyLayout(
-          ch,
-          { x: 0, y: 0, w: availW, h: availH },
-          { x: parentOffset.x + availX, y: parentOffset.y + availY },
-        );
+      // First, compute children sizes (recursively) with current container size as reference (for %).
+      const childSize = new Map(); // uid -> {w,h}
+      function computeChildSize(chNode, curW, curH) {
+        const tag = chNode.tag;
+        const baseSz = resolveBaseSize(chNode, curW, curH);
+        let intrinsic;
+
+        const chEl = domByUid.get(chNode.uid);
+        if (isContainerTag(tag)) {
+          // Container child (F) size depends on its own kids, so recurse.
+          intrinsic = layoutContainer(chNode, chEl, curW, curH, { root: false });
+        } else {
+          // Apply fixed-size constraints (crop/scroll) BEFORE measuring intrinsic.
+          // This is critical for cases like width=100C with long caption: height must be measured after wrapping.
+          const wOverflow = chNode.size?.w?.overflow || null;
+          const hOverflow = chNode.size?.h?.overflow || null;
+          const constrainW = !!wOverflow;
+          const constrainH = !!hOverflow;
+          if (chEl) {
+            if (constrainW && baseSz.w != null) chEl.style.width = `${baseSz.w}px`;
+            else chEl.style.width = "";
+            if (constrainH && baseSz.h != null) chEl.style.height = `${baseSz.h}px`;
+            else chEl.style.height = "";
+          }
+          intrinsic = measureIntrinsic(chNode);
+        }
+
+        const ow = chNode.size?.w?.overflow || null;
+        const oh = chNode.size?.h?.overflow || null;
+
+        // Apply overflow styles to element itself (affects its content).
+        if (chEl) setOverflowStyles(chEl, chNode.size?.w || null, chNode.size?.h || null);
+
+        // Default behavior: if content doesn't fit explicit size, element expands (unless C/S).
+        const wFinal = chNode.size?.w
+          ? ow
+            ? baseSz.w ?? 0
+            : Math.max(baseSz.w ?? 0, intrinsic.w)
+          : intrinsic.w;
+        const hFinal = chNode.size?.h
+          ? oh
+            ? baseSz.h ?? 0
+            : Math.max(baseSz.h ?? 0, intrinsic.h)
+          : intrinsic.h;
+
+        return { w: wFinal, h: hFinal };
+      }
+
+      // Iteration is handled by the outer loop; here we use cw/ch as the current container size.
+      for (const chNode of kids) {
+        childSize.set(chNode.uid, computeChildSize(chNode, cw || parentW || 0, ch || parentH || 0));
+      }
+
+      // Compute required width/height for the container based on stacking rules (no overlaps).
+      // Horizontal stacking within mid band: L-group, Center-group, R-group (each keeps UXL order)
+      const midL = [];
+      const midC = [];
+      const midR = [];
+      for (const n of mid) {
+        const hA = n.align?.h || null;
+        if (hA === "L") midL.push(n);
+        else if (hA === "R") midR.push(n);
+        else midC.push(n);
+      }
+      const sumW = (arr) => arr.reduce((a, n) => a + (childSize.get(n.uid)?.w || 0), 0);
+      const sumH = (arr) => arr.reduce((a, n) => a + (childSize.get(n.uid)?.h || 0), 0);
+      const maxH = (arr) => arr.reduce((a, n) => Math.max(a, childSize.get(n.uid)?.h || 0), 0);
+      const maxW = (arr) => arr.reduce((a, n) => Math.max(a, childSize.get(n.uid)?.w || 0), 0);
+
+      const topH = sumH(top);
+      const bottomH = sumH(bottom);
+      const midH = maxH(mid);
+      const neededH = topH + midH + bottomH;
+
+      const neededW = Math.max(
+        maxW(kids),
+        sumW(midL) + sumW(midC) + sumW(midR),
+      );
+
+      // Apply container growth by default (unless crop/scroll is set on that axis, in which case size is fixed to base).
+      // Root (P) scrolls by default, so its size does not auto-grow.
+      const contOw = node.size?.w?.overflow || (root ? windowSize.overflowW || "scroll" : null) || null;
+      const contOh = node.size?.h?.overflow || (root ? windowSize.overflowH || "scroll" : null) || null;
+      if (!contOw) cw = Math.max(cw, neededW);
+      if (!contOh) ch = Math.max(ch, neededH);
+
+      // Now place children.
+      function rectsOverlap(a, b) {
+        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+      }
+
+      function placeBand(nodes, { vAlign, pushDown }) {
+        // vAlign is "T" or "B". If overlaps occur, move along Y away from the edge:
+        // - top band: push down
+        // - bottom band: push up
+        const placed = []; // {uid,x,y,w,h}
+        for (const n of nodes) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const hA = n.align?.h || null;
+          const pref = alignToXY({ hAlign: hA, vAlign, parentW: cw, parentH: ch, w: sz.w, h: sz.h });
+          let x = pref.x;
+          let y = pref.y;
+
+          // Resolve overlaps against already placed nodes in this band.
+          // Deterministic: scan in UXL order; when overlap found, jump past the blocking rect edge.
+          let changed = true;
+          let guard = 0;
+          while (changed && guard++ < 50) {
+            changed = false;
+            for (const p of placed) {
+              const cur = { x, y, w: sz.w, h: sz.h };
+              if (!rectsOverlap(cur, p)) continue;
+              if (pushDown) {
+                y = Math.max(y, p.y + p.h);
+              } else {
+                y = Math.min(y, p.y - sz.h);
+              }
+              changed = true;
+            }
+          }
+
+          const eln = domByUid.get(n.uid);
+          if (eln) {
+            eln.style.left = `${x}px`;
+            eln.style.top = `${y}px`;
+            eln.style.width = `${sz.w}px`;
+            eln.style.height = `${sz.h}px`;
+          }
+          placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+        }
+        return placed;
+      }
+
+      // 1) Top band: prefer y=0; on overlap push down (keep RT in the corner unless it intersects)
+      const placedTop = placeBand(top, { vAlign: "T", pushDown: true });
+      const topExtent = placedTop.reduce((m, r) => Math.max(m, r.y + r.h), 0);
+
+      // 2) Bottom band: prefer bottom; on overlap push up
+      const placedBottom = placeBand(bottom, { vAlign: "B", pushDown: false });
+      const bottomStart = placedBottom.length ? placedBottom.reduce((m, r) => Math.min(m, r.y), ch) : ch;
+
+      // 3) Middle band: horizontal packing between top and bottom, centered vertically in the remaining space.
+      const midAreaY = topExtent;
+      const midAreaH = Math.max(0, bottomStart - topExtent);
+      const midY = midAreaY + Math.max(0, Math.round((midAreaH - midH) / 2));
+
+      const leftW = sumW(midL);
+      const rightW = sumW(midR);
+      const centerW = sumW(midC);
+      const contentW = leftW + centerW + rightW;
+      if (!contOw) cw = Math.max(cw, contentW);
+
+      // L group: left to right
+      let xL = 0;
+      for (const n of midL) {
+        const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+        const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
+        const eln = domByUid.get(n.uid);
+        if (eln) {
+          eln.style.left = `${xL}px`;
+          eln.style.top = `${y}px`;
+          eln.style.width = `${sz.w}px`;
+          eln.style.height = `${sz.h}px`;
+        }
+        xL += sz.w;
+      }
+
+      // R group: right to left
+      let xR = cw;
+      for (let i = midR.length - 1; i >= 0; i--) {
+        const n = midR[i];
+        const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+        xR -= sz.w;
+        const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
+        const eln = domByUid.get(n.uid);
+        if (eln) {
+          eln.style.left = `${xR}px`;
+          eln.style.top = `${y}px`;
+          eln.style.width = `${sz.w}px`;
+          eln.style.height = `${sz.h}px`;
+        }
+      }
+
+      // Center group: packed left-to-right, but centered between L and R if possible.
+      const betweenL = xL;
+      const betweenR = xR;
+      const space = Math.max(0, betweenR - betweenL);
+      const startC = betweenL + Math.max(0, Math.round((space - centerW) / 2));
+      let xC = startC;
+      for (const n of midC) {
+        const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+        const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
+        const eln = domByUid.get(n.uid);
+        if (eln) {
+          eln.style.left = `${xC}px`;
+          eln.style.top = `${y}px`;
+          eln.style.width = `${sz.w}px`;
+          eln.style.height = `${sz.h}px`;
+        }
+        xC += sz.w;
+      }
+
+      return { w: cw, h: ch };
+    }
+
+    function relayout() {
+      const cs = getComputedStyle(containerEl);
+      const borderX = (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+      const borderY = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+
+      // Working area for P is the window size (WxH). Scrollbars must not reduce this area.
+      const targetInnerW = Math.max(0, windowSize.w);
+      const targetInnerH = Math.max(0, windowSize.h);
+      const sb = getScrollbarThicknessPx();
+
+      // We may need 1-2 passes: scrollbars can cause cascaded overflow.
+      let needV = false;
+      let needH = false;
+      for (let pass = 0; pass < 2; pass++) {
+        // Set outer size so that client area (excluding borders and scrollbars) equals targetInner.
+        const extraW = needV ? sb.w : 0;
+        const extraH = needH ? sb.h : 0;
+        containerEl.style.width = `${targetInnerW + borderX + extraW}px`;
+        containerEl.style.height = `${targetInnerH + borderY + extraH}px`;
+
+        // Layout uses the working area, not the reduced client size.
+        layoutContainer(rootNode, containerEl, targetInnerW, targetInnerH, { root: true });
+
+        // Re-evaluate overflow needs against the working area (not against clientWidth which may be reduced).
+        const sw = containerEl.scrollWidth;
+        const sh = containerEl.scrollHeight;
+        const nextNeedH = sw > targetInnerW + 1; // +1 for rounding noise
+        const nextNeedV = sh > targetInnerH + 1;
+        if (nextNeedH === needH && nextNeedV === needV) break;
+        needH = nextNeedH;
+        needV = nextNeedV;
       }
     }
 
-    const rootRect = { x: 0, y: 0, w: windowSize.w, h: windowSize.h };
-    // Apply layout starting at children of P (relative to canvas)
-    layoutChildren(rootNode.children || [], rootRect, { x: 0, y: 0 });
+    // Defer first layout until the page subtree is attached to DOM, otherwise intrinsic measurements are 0.
+    requestAnimationFrame(() => relayout());
 
     return domByUid;
   }
@@ -928,7 +1374,9 @@
     marker.setAttribute("refY", "5");
     marker.setAttribute("markerWidth", "6");
     marker.setAttribute("markerHeight", "6");
-    marker.setAttribute("orient", "auto");
+    // Use auto-start-reverse so marker-start points "into" the start node (opposite path direction),
+    // which is what we want for bidirectional links (arrows on both ends).
+    marker.setAttribute("orient", "auto-start-reverse");
     marker.setAttribute("markerUnits", "strokeWidth");
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
@@ -939,7 +1387,7 @@
   }
 
   function drawOrthogonalRounded(svg, start, end, opts = {}) {
-    const { endCircle = true, circleRadius = 4, arrowMarkerId = null, points = null } = opts;
+    const { endCircle = true, circleRadius = 4, arrowMarkerId = null, arrowStartMarkerId = null, points = null } = opts;
     const pts =
       points ??
       (() => {
@@ -956,6 +1404,7 @@
     path.setAttribute("stroke-linejoin", "round");
     path.setAttribute("stroke-linecap", "round");
     if (arrowMarkerId) path.setAttribute("marker-end", `url(#${arrowMarkerId})`);
+    if (arrowStartMarkerId) path.setAttribute("marker-start", `url(#${arrowStartMarkerId})`);
     svg.append(path);
 
     if (endCircle) {
@@ -977,13 +1426,28 @@
     overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     const arrowId = "uxl-arrow";
 
-    const pageEls = new Map(); // lowerId -> el
+    const pageEls = new Map(); // pageUid -> el
     for (const p of ast.pages) {
-      const idKey = normalizeId(p.id);
-      const pageEl = el("div", { class: "uxl-map__page", "data-page-id": idKey });
+      const pageKey = p.uid;
+      const pageEl = el("div", { class: "uxl-map__page", "data-page-uid": pageKey });
       // Use controlled <br> wrapping for long captions (more than 3 words).
-      pageEl.innerHTML = formatMapCaption(p.caption || p.id);
-      pageEls.set(idKey, pageEl);
+      pageEl.innerHTML = formatMapCaption(pageLabel(p));
+      pageEl.style.cursor = "pointer";
+      pageEl.title = "Перейти к странице";
+      pageEl.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const pageUid = pageKey;
+        const pageBlock = document.querySelector(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
+        const headEl = pageBlock?.querySelector(".uxl-page__head") || pageBlock;
+        if (!headEl) return;
+        headEl.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
+        // Highlight the target page (same as GOTO)
+        pageBlock.classList.remove("uxl-page--goto");
+        void pageBlock.offsetWidth;
+        pageBlock.classList.add("uxl-page--goto");
+        window.setTimeout(() => pageBlock.classList.remove("uxl-page--goto"), 2400);
+      });
+      pageEls.set(pageKey, pageEl);
       grid.append(pageEl);
     }
 
@@ -1007,22 +1471,25 @@
 
     function layoutAsTree() {
       // Root: first page in the block
-      const pagesInOrder = ast.pages.map((p) => normalizeId(p.id));
-      const rootId = pagesInOrder[0] || null;
-      const level = new Map(); // pageId -> number
-      if (rootId) level.set(rootId, 0);
+      const pagesInOrder = ast.pages.map((p) => p.uid);
+      const rootUid = pagesInOrder[0] || null;
+      const level = new Map(); // pageUid -> number
+      if (rootUid) level.set(rootUid, 0);
 
-      const outgoing = new Map(); // from -> Set(to)
+      const outgoing = new Map(); // fromUid -> Set(toUid)
       for (const e of ast.edges) {
-        const f = normalizeId(e.fromId);
-        const t = normalizeId(e.toId);
-        if (!outgoing.has(f)) outgoing.set(f, new Set());
-        outgoing.get(f).add(t);
+        const fKey = normalizeId(e.fromId);
+        const tKey = normalizeId(e.toId);
+        const fromUid = ast.pageIdToUid?.[fKey] || null;
+        const toUid = ast.pageIdToUid?.[tKey] || null;
+        if (!fromUid || !toUid) continue;
+        if (!outgoing.has(fromUid)) outgoing.set(fromUid, new Set());
+        outgoing.get(fromUid).add(toUid);
       }
 
       // BFS-like relax
       const q = [];
-      if (rootId) q.push(rootId);
+      if (rootUid) q.push(rootUid);
       while (q.length) {
         const cur = q.shift();
         const curLvl = level.get(cur) ?? 0;
@@ -1037,26 +1504,26 @@
       }
 
       // Unreachable pages: place at level 0 after root, stacked below
-      for (const pid of pagesInOrder) {
-        if (!level.has(pid)) level.set(pid, 0);
+      for (const uid of pagesInOrder) {
+        if (!level.has(uid)) level.set(uid, 0);
       }
 
       // Group by level; preserve original order within each level
-      const groups = new Map(); // lvl -> [pageId]
-      for (const pid of pagesInOrder) {
-        const lvl = level.get(pid) ?? 0;
+      const groups = new Map(); // lvl -> [pageUid]
+      for (const uid of pagesInOrder) {
+        const lvl = level.get(uid) ?? 0;
         if (!groups.has(lvl)) groups.set(lvl, []);
-        groups.get(lvl).push(pid);
+        groups.get(lvl).push(uid);
       }
       const levels = Array.from(groups.keys()).sort((a, b) => a - b);
 
       // Measure node sizes
-      const sizes = new Map(); // pid -> {w,h}
-      for (const pid of pagesInOrder) {
-        const elp = pageEls.get(pid);
+      const sizes = new Map(); // uid -> {w,h}
+      for (const uid of pagesInOrder) {
+        const elp = pageEls.get(uid);
         if (!elp) continue;
         const r = elp.getBoundingClientRect();
-        sizes.set(pid, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
+        sizes.set(uid, { w: Math.ceil(r.width), h: Math.ceil(r.height) });
       }
 
       const colGap = 80;
@@ -1065,8 +1532,8 @@
       const colWidths = new Map();
       for (const lvl of levels) {
         let maxW = 0;
-        for (const pid of groups.get(lvl)) {
-          const s = sizes.get(pid) || { w: 160, h: 48 };
+        for (const uid of groups.get(lvl)) {
+          const s = sizes.get(uid) || { w: 160, h: 48 };
           maxW = Math.max(maxW, s.w);
         }
         colWidths.set(lvl, maxW);
@@ -1084,10 +1551,10 @@
       let totalH = 0;
       for (const lvl of levels) {
         let y = 0;
-        for (const pid of groups.get(lvl)) {
-          const elp = pageEls.get(pid);
+        for (const uid of groups.get(lvl)) {
+          const elp = pageEls.get(uid);
           if (!elp) continue;
-          const s = sizes.get(pid) || { w: 160, h: 48 };
+          const s = sizes.get(uid) || { w: 160, h: 48 };
           elp.style.left = `${xOffset.get(lvl)}px`;
           elp.style.top = `${y}px`;
           elp.style.width = `${s.w}px`;
@@ -1111,15 +1578,27 @@
       overlay.setAttribute("width", String(Math.round(gridRect.width)));
       overlay.setAttribute("height", String(Math.round(gridRect.height)));
 
-      const edgeKeys = new Set(ast.edges.map((e) => `${normalizeId(e.fromId)}=>${normalizeId(e.toId)}`));
-      const outgoing = new Map(); // from -> edges[]
+      // Merge bidirectional transitions: A<->B is drawn as a single connection with arrows on both ends.
+      // Also dedupe multiple A->B (already deduped in ast.edges).
+      const byPair = new Map(); // pairKey -> {aKey,bKey,aUid,bUid,ab:boolean,ba:boolean}
       for (const e of ast.edges) {
-        const f = normalizeId(e.fromId);
-        if (!outgoing.has(f)) outgoing.set(f, []);
-        outgoing.get(f).push(e);
-      }
-      for (const [f, arr] of outgoing.entries()) {
-        arr.sort((a, b) => normalizeId(a.toId).localeCompare(normalizeId(b.toId)));
+        const aKey = normalizeId(e.fromId);
+        const bKey = normalizeId(e.toId);
+        if (!aKey || !bKey) continue;
+        const lo = aKey < bKey ? aKey : bKey;
+        const hi = aKey < bKey ? bKey : aKey;
+        const pairKey = `${lo}<=>${hi}`;
+        const ent = byPair.get(pairKey) || {
+          lo,
+          hi,
+          loUid: ast.pageIdToUid?.[lo] || null,
+          hiUid: ast.pageIdToUid?.[hi] || null,
+          loToHi: false,
+          hiToLo: false,
+        };
+        if (aKey === lo && bKey === hi) ent.loToHi = true;
+        if (aKey === hi && bKey === lo) ent.hiToLo = true;
+        byPair.set(pairKey, ent);
       }
 
       function rectRel(el) {
@@ -1138,33 +1617,51 @@
         };
       }
 
-      for (const e of ast.edges) {
-        const fromKey = normalizeId(e.fromId);
-        const toKey = normalizeId(e.toId);
-        const fromEl = pageEls.get(fromKey);
-        const toEl = pageEls.get(toKey);
-        if (!fromEl || !toEl) continue;
+      for (const ent of byPair.values()) {
+        const loUid = ent.loUid;
+        const hiUid = ent.hiUid;
+        const loEl = loUid ? pageEls.get(loUid) : null;
+        const hiEl = hiUid ? pageEls.get(hiUid) : null;
+        if (!loEl || !hiEl) continue;
 
-        const a = rectRel(fromEl);
-        const b = rectRel(toEl);
+        const loRect = rectRel(loEl);
+        const hiRect = rectRel(hiEl);
 
-        const dirRight = b.midX >= a.midX;
+        const bidir = ent.loToHi && ent.hiToLo;
+
+        // Determine logical direction for single-direction links.
+        // For bidirectional, direction is irrelevant; we route left-to-right in screen space.
+        let fromRect = loRect;
+        let toRect = hiRect;
+        if (!bidir) {
+          if (ent.loToHi) {
+            fromRect = loRect;
+            toRect = hiRect;
+          } else if (ent.hiToLo) {
+            fromRect = hiRect;
+            toRect = loRect;
+          } else {
+            continue;
+          }
+        } else {
+          // Screen-space left-to-right so the polyline is stable.
+          if (loRect.midX <= hiRect.midX) {
+            fromRect = loRect;
+            toRect = hiRect;
+          } else {
+            fromRect = hiRect;
+            toRect = loRect;
+          }
+        }
+
         const pad = 2;
-        const startX = dirRight ? a.right + pad : a.left - pad;
-        const endX = dirRight ? b.left - pad : b.right + pad;
+        const toRight = toRect.midX >= fromRect.midX;
+        const startX = toRight ? fromRect.right + pad : fromRect.left - pad;
+        const endX = toRight ? toRect.left - pad : toRect.right + pad;
+        const startY = fromRect.midY;
+        const endY = toRect.midY;
 
-        const out = outgoing.get(fromKey) || [];
-        const outIdx = Math.max(0, out.findIndex((x) => normalizeId(x.toId) === toKey));
-        const outShift = (outIdx - (out.length - 1) / 2) * 10;
-
-        const hasReverse = edgeKeys.has(`${toKey}=>${fromKey}`);
-        const pairShift = hasReverse ? (fromKey < toKey ? -6 : 6) : 0;
-
-        const startY = a.midY + outShift + pairShift;
-        const endY = b.midY + pairShift;
-
-        // Route like the sketch: orthogonal with a midX bend, spread to avoid overlap.
-        const midX = Math.round((startX + endX) / 2 + outShift * 0.3 + pairShift);
+        const midX = Math.round((startX + endX) / 2);
         const pts = [
           { x: Math.round(startX), y: Math.round(startY) },
           { x: midX, y: Math.round(startY) },
@@ -1172,12 +1669,12 @@
           { x: Math.round(endX), y: Math.round(endY) },
         ];
 
-        drawOrthogonalRounded(
-          overlay,
-          { x: startX, y: startY },
-          { x: endX, y: endY },
-          { endCircle: false, arrowMarkerId, points: pts },
-        );
+        drawOrthogonalRounded(overlay, { x: startX, y: startY }, { x: endX, y: endY }, {
+          endCircle: false,
+          arrowMarkerId: arrowId,
+          arrowStartMarkerId: bidir ? arrowId : null,
+          points: pts,
+        });
       }
     }
 
@@ -1196,9 +1693,9 @@
   }
 
   function renderPageSection(ast, pageNode) {
-    const page = el("div", { class: "uxl-page", "data-page-id": normalizeId(pageNode.id) });
-    const headText = pageNode.caption || pageNode.id;
-    const head = el("div", { class: "uxl-page__head", text: `Страница ${headText}` });
+    const page = el("div", { class: "uxl-page", "data-page-uid": pageNode.uid });
+    const headText = pageLabel(pageNode);
+    const head = el("div", { class: "uxl-page__head", text: headText });
     const body = el("div", { class: "uxl-page__body" });
     const canvasWrap = el("div", { class: "uxl-canvas-wrap" });
     const canvas = el("div", { class: "uxl-canvas" });
@@ -1216,8 +1713,48 @@
     body.append(canvasWrap, hints, overlay);
     page.append(head, body);
 
-    // Render + layout
+    // Render nodes; layout will run on next animation frame (after DOM insertion).
     const domByUid = layoutTree(canvas, pageNode, ast.window);
+
+    // Wire button clicks (GOTO) to navigate between pages (scroll the browser page).
+    function wireGotoClicks() {
+      const buttons = Array.from(canvas.querySelectorAll('button.uxl-B[data-uxl-uid]'));
+      for (const btn of buttons) {
+        const uid = btn.getAttribute("data-uxl-uid");
+        if (!uid) continue;
+        const node = ast.nodeByUid?.get(uid) || null;
+        if (!node || !node.action || node.action.type !== "GOTO") continue;
+        btn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const targetId = String(node.action.target || "").trim();
+          const targetKey = normalizeId(targetId);
+          const pageUid = ast.pageIdToUid?.[targetKey] || null;
+          if (!pageUid) {
+            // Target page must have an ID to be addressable.
+            alert(`UXL: страница для GOTO не найдена: "${targetId}"`);
+            return;
+          }
+          const pageEl = document.querySelector(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
+          const headEl = pageEl?.querySelector(".uxl-page__head") || pageEl;
+          if (!headEl) {
+            alert(`UXL: не удалось перейти к странице "${targetId}" (DOM не найден).`);
+            return;
+          }
+          headEl.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
+
+          // Highlight target page: title + canvas border animate red like hints.
+          if (pageEl) {
+            pageEl.classList.remove("uxl-page--goto");
+            // force reflow to restart animation
+            void pageEl.offsetWidth;
+            pageEl.classList.add("uxl-page--goto");
+            window.setTimeout(() => pageEl.classList.remove("uxl-page--goto"), 2400);
+          }
+        });
+      }
+    }
+    // Defer wiring until DOM is in place (after renderAll replacement).
+    queueMicrotask(() => wireGotoClicks());
 
     // Collect hints (only nodes with non-empty hint)
     const hintItems = [];
@@ -1227,12 +1764,18 @@
       }
       for (const ch of node.children || []) collectHints(ch);
     }
-    for (const ch of pageNode.children || []) collectHints(ch);
+    // Include page itself if it has hint.
+    collectHints(pageNode);
 
     for (const n of hintItems) {
-      const dot = el("span", { class: "uxl-hint-dot", "data-uxl-dot": "1" });
       const text = el("span", { class: "uxl-hint-text", text: n.hint });
-      const li = el("li", { class: "uxl-hints__item", "data-uxl-uid": n.uid }, [dot, text]);
+      const isPageHint = n.uid === pageNode.uid;
+      const children = isPageHint ? [text] : [el("span", { class: "uxl-hint-dot", "data-uxl-dot": "1" }), text];
+      const li = el(
+        "li",
+        { class: isPageHint ? "uxl-hints__item uxl-hints__item--page" : "uxl-hints__item", "data-uxl-uid": n.uid },
+        children,
+      );
       list.append(li);
     }
 
@@ -1243,9 +1786,12 @@
       overlay.setAttribute("width", String(Math.round(bodyRect.width)));
       overlay.setAttribute("height", String(Math.round(bodyRect.height)));
 
-      for (const n of hintItems) {
+      const hintWithLines = hintItems.filter((n) => n.uid !== pageNode.uid);
+      for (let idx = 0; idx < hintWithLines.length; idx++) {
+        const n = hintWithLines[idx];
+        // Page hint is listed, but it must not have a callout line.
         const li = list.querySelector(`li[data-uxl-uid="${CSS.escape(n.uid)}"]`);
-        const target = domByUid.get(n.uid);
+        const target = n.uid === pageNode.uid ? canvas : domByUid.get(n.uid);
         if (!li || !target) continue;
         const dot = li.querySelector('[data-uxl-dot="1"]');
         if (!dot) continue;
@@ -1254,14 +1800,29 @@
         const tRect = target.getBoundingClientRect();
 
         const start = { x: dotRect.left + dotRect.width / 2 - bodyRect.left, y: dotRect.top + dotRect.height / 2 - bodyRect.top };
-        // End point should land on the edge of the element facing the hints list (right edge).
-        const end = { x: tRect.right - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
-        drawOrthogonalRounded(overlay, start, end, { endCircle: true, circleRadius: 2, arrowMarkerId: null });
+        // End point should land on the edge facing the hints list (right edge).
+        // Add deterministic vertical spread so multiple callouts don't collapse into a single horizontal line.
+        const baseEnd = { x: tRect.right - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
+        const spread = (idx - (hintWithLines.length - 1) / 2) * 8;
+        const end = { x: baseEnd.x, y: baseEnd.y + spread };
+
+        // Route is orthogonal (as before).
+        const midX = Math.round((start.x + end.x) / 2);
+        const pts = [
+          { x: Math.round(start.x), y: Math.round(start.y) },
+          { x: midX, y: Math.round(start.y) },
+          { x: midX, y: Math.round(end.y) },
+          { x: Math.round(end.x), y: Math.round(end.y) },
+        ];
+
+        drawOrthogonalRounded(overlay, start, end, { endCircle: true, circleRadius: 4, arrowMarkerId: null, points: pts });
       }
     }
 
-    queueMicrotask(() => redrawHintLines());
-    window.addEventListener("resize", () => redrawHintLines());
+    // Wait a frame so layout has a chance to run before drawing hint lines.
+    requestAnimationFrame(() => redrawHintLines());
+    window.addEventListener("resize", () => requestAnimationFrame(() => redrawHintLines()));
+    canvas.addEventListener("scroll", () => requestAnimationFrame(() => redrawHintLines()));
 
     return page;
   }
