@@ -31,6 +31,12 @@
   border-color: color-mix(in srgb, var(--uxl-accent) 40%, var(--uxl-border));
 }
 
+.uxl-toolbar__btn--active,
+.uxl-toolbar__btn[aria-pressed="true"] {
+  border-color: var(--uxl-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--uxl-accent) 25%, transparent);
+}
+
 .uxl-toolbar__ver {
   color: var(--uxl-muted);
   font: 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;

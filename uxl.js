@@ -1759,7 +1759,7 @@
     return map;
   }
 
-  function renderPageSection(ast, pageNode) {
+  function renderPageSection(ast, pageNode, { windowOverride = null } = {}) {
     const page = el("div", { class: "uxl-page", "data-page-uid": pageNode.uid });
     const headText = pageLabel(pageNode);
     const head = el("div", { class: "uxl-page__head", text: headText });
@@ -1767,8 +1767,9 @@
     const canvasWrap = el("div", { class: "uxl-canvas-wrap" });
     const canvasScale = el("div", { class: "uxl-canvas-scale" });
     const canvas = el("div", { class: "uxl-canvas" });
-    canvas.style.width = `${ast.window.w}px`;
-    canvas.style.height = `${ast.window.h}px`;
+    const win = windowOverride || ast.window;
+    canvas.style.width = `${win.w}px`;
+    canvas.style.height = `${win.h}px`;
     canvasScale.append(canvas);
     canvasWrap.append(canvasScale);
 
@@ -1783,7 +1784,7 @@
     page.append(head, body);
 
     // Render nodes; layout will run on next animation frame (after DOM insertion).
-    const domByUid = layoutTree(canvas, pageNode, ast.window);
+    const domByUid = layoutTree(canvas, pageNode, win);
 
     function applyResponsiveScale() {
       // Only scale down on small screens to fit width; desktop keeps 1:1.
@@ -1801,12 +1802,12 @@
       const bodyRect = body.getBoundingClientRect();
       const pad = 8;
       const availW = Math.max(0, bodyRect.width - pad * 2);
-      const scale = Math.max(0.1, Math.min(1, availW / ast.window.w));
+      const scale = Math.max(0.1, Math.min(1, availW / win.w));
       canvasScale.style.transformOrigin = "top left";
       canvasScale.style.transform = `scale(${scale})`;
       // Ensure the scaled wrapper contributes correct layout size (prevents horizontal scroll).
-      canvasScale.style.width = `${Math.round(ast.window.w * scale)}px`;
-      canvasScale.style.height = `${Math.round(ast.window.h * scale)}px`;
+      canvasScale.style.width = `${Math.round(win.w * scale)}px`;
+      canvasScale.style.height = `${Math.round(win.h * scale)}px`;
     }
 
     requestAnimationFrame(() => applyResponsiveScale());
@@ -1902,7 +1903,7 @@
       if (mobile) return;
 
       const canvasRect = canvas.getBoundingClientRect();
-      const baseW = ast.window?.w || canvas.offsetWidth || 1;
+      const baseW = win?.w || canvas.offsetWidth || 1;
       const scale = Math.max(0.0001, canvasRect.width / baseW);
 
       const badgeR = 9; // px (half of 18px badge)
@@ -2108,17 +2109,50 @@
     renderCurrent();
   }
 
+  function getViewportWindowSize() {
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width : window.innerWidth;
+    const vh = vv ? vv.height : window.innerHeight;
+    const pad = 16;
+    return {
+      w: Math.max(240, Math.floor(vw - pad)),
+      h: Math.max(240, Math.floor(vh - pad)),
+    };
+  }
+
   function renderAst(ast, { uxlText = "", mode = "permissive" } = {}) {
     const root = el("div", { class: "uxl-root" });
     const toolbar = el("div", { class: "uxl-toolbar" });
     const protoBtn = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Открыть прототип" });
     protoBtn.addEventListener("click", () => openPrototypeForText(uxlText, { mode }));
     toolbar.append(protoBtn);
+
+    const viewModeKey = "uxl:viewMode";
+    const savedViewMode = localStorage.getItem(viewModeKey);
+    const viewMode = savedViewMode === "fullscreen" ? "fullscreen" : "1:1";
+
+    const btn11 = el("button", { class: "uxl-toolbar__btn", type: "button", text: "1:1" });
+    const btnFs = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Full Screen" });
+    btn11.setAttribute("aria-pressed", viewMode === "1:1" ? "true" : "false");
+    btnFs.setAttribute("aria-pressed", viewMode === "fullscreen" ? "true" : "false");
+    if (viewMode === "1:1") btn11.classList.add("uxl-toolbar__btn--active");
+    if (viewMode === "fullscreen") btnFs.classList.add("uxl-toolbar__btn--active");
+
+    function rerenderWith(nextMode) {
+      localStorage.setItem(viewModeKey, nextMode);
+      const here = root;
+      const next = renderAst(ast, { uxlText, mode });
+      here.replaceWith(next);
+    }
+    btn11.addEventListener("click", () => rerenderWith("1:1"));
+    btnFs.addEventListener("click", () => rerenderWith("fullscreen"));
+    toolbar.append(btn11, btnFs);
     root.append(toolbar);
     root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });
-    for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p));
+    const windowOverride = viewMode === "fullscreen" ? getViewportWindowSize() : null;
+    for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p, { windowOverride }));
     root.append(pagesWrap);
 
     const footer = el("div", { class: "uxl-footer" });
