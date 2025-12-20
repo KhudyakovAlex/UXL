@@ -1901,16 +1901,14 @@
 
     const root = el("div", { class: "uxl-root uxl-proto-root" });
     const frame = el("div", { class: "uxl-proto-frame" });
-    const backBtn = el("button", { class: "uxl-proto-back", type: "button", text: "← Назад" });
     const canvas = el("div", { class: "uxl-canvas" });
     canvas.style.width = `${ast.window.w}px`;
     canvas.style.height = `${ast.window.h}px`;
-    frame.append(backBtn, canvas);
+    frame.append(canvas);
     root.append(frame);
     document.body.replaceChildren(root);
 
     const pageByUid = new Map(ast.pages.map((p) => [p.uid, p]));
-    const history = [];
     let currentUid = ast.pages[0]?.uid || null;
 
     function renderCurrent() {
@@ -1937,20 +1935,13 @@
             alert(`UXL: страница для GOTO не найдена: "${targetId}"`);
             return;
           }
-          history.push(currentUid);
           currentUid = targetUid;
           renderCurrent();
         });
       }
 
-      backBtn.disabled = history.length === 0;
+      // No explicit back button in prototype; use browser back if needed.
     }
-
-    backBtn.addEventListener("click", () => {
-      if (history.length === 0) return;
-      currentUid = history.pop();
-      renderCurrent();
-    });
 
     function applyScaleToFit() {
       // Scale the whole "window" to fit viewport without overflowing.
@@ -1960,13 +1951,13 @@
 
       // Leave tiny breathing room + room for the back link above the canvas.
       const pad = 8;
-      const backH = 44;
-
       const availW = Math.max(0, vw - pad * 2);
-      const availH = Math.max(0, vh - pad * 2 - backH);
+      const availH = Math.max(0, vh - pad * 2);
       const baseW = ast.window.w;
       const baseH = ast.window.h;
-      const scale = Math.max(0.1, Math.min(1, availW / baseW, availH / baseH));
+      // Allow upscaling so prototype is максимально крупно на телефоне.
+      const maxScale = 4;
+      const scale = Math.max(0.1, Math.min(maxScale, availW / baseW, availH / baseH));
 
       frame.style.transformOrigin = "center center";
       frame.style.transform = `scale(${scale})`;
