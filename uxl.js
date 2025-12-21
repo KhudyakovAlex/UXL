@@ -383,6 +383,11 @@
       return /^ICON:/i.test(v);
     }
 
+    function isBgToken(s) {
+      const v = String(s || "").trim();
+      return /^BG:/i.test(v);
+    }
+
     function parseIntNonNegative(raw, metaForErr, what) {
       const n = Number.parseInt(String(raw), 10);
       if (!Number.isFinite(n) || String(n) !== String(raw).trim()) {
@@ -442,6 +447,7 @@
         allowPadding = false,
         allowRadius = false,
         allowIcon = false,
+        allowBg = false,
       } = {},
     ) {
       let sizeStr = "";
@@ -454,6 +460,7 @@
       let radiusPx = null;
       let iconName = "";
       let iconSizePx = null;
+      let bgUrl = "";
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -506,6 +513,11 @@
           iconSizePx = val;
           return;
         }
+        if (kind === "bg") {
+          if (bgUrl) throw formatError(tag, "BG указан более одного раза.");
+          bgUrl = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -522,6 +534,9 @@
         }
         if (isIconToken(v) && !allowIcon) {
           throw formatError(tag, `Поле "${v}" (icon) не поддерживается для этого тега.`);
+        }
+        if (isBgToken(v) && !allowBg) {
+          throw formatError(tag, `Поле "${v}" (bg) не поддерживается для этого тега.`);
         }
         if (allowMargin && isMarginToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "MARGIN");
@@ -560,6 +575,12 @@
           }
           continue;
         }
+        if (allowBg && isBgToken(v)) {
+          const url = String(v.slice("BG:".length)).trim();
+          if (!url) throw formatError(tag, `BG должен быть вида "BG:https://..." (URL не может быть пустым).`);
+          setOnce("bg", url);
+          continue;
+        }
         if (allowCols && isColsToken(v)) {
           setOnce("cols", v);
           continue;
@@ -582,7 +603,7 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
-      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx, iconName, iconSizePx };
+      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx, iconName, iconSizePx, bgUrl };
     }
 
     if (tag === "P") {
@@ -710,12 +731,14 @@
         allowHint: true,
         allowMargin: false,
         allowPadding: true,
+        allowBg: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const hint = rest.hint;
+      const bg = rest.bgUrl || "";
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
-      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, ...common, rawLineNo: lineNo } };
+      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, bg, ...common, rawLineNo: lineNo } };
     }
 
     if (tag === "T") {
@@ -1403,6 +1426,14 @@
         nodeEl = el("div", { class: "uxl-node uxl-F", "data-uxl-uid": node.uid });
         if (node.hint) nodeEl.title = node.hint;
         if (Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
+        const bg = String(node.bg || "").trim();
+        if (bg) {
+          const safe = bg.replaceAll('"', "%22");
+          nodeEl.style.backgroundImage = `url("${safe}")`;
+          nodeEl.style.backgroundRepeat = "no-repeat";
+          nodeEl.style.backgroundPosition = "center";
+          nodeEl.style.backgroundSize = "cover";
+        }
         domByUid.set(node.uid, nodeEl);
         parentEl.append(nodeEl);
         for (const ch of node.children || []) renderNode(ch, nodeEl);
