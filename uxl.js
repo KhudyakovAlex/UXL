@@ -319,8 +319,8 @@
           return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
         case "B":
           return {
-            format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\Кнопка\\ICON:search:18\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
+            format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
+            example: "B\\ICON:search:18\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return { format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\P6\\M4\\Подсказка" };
@@ -622,9 +622,19 @@
     // T: T[\SIZE][\ALIGN][\HINT] (ACTION is not supported; handled by structure validation)
 
     if (tag === "B") {
-      const caption = get(1);
-      if (!String(caption).trim()) throw formatError("B", "CAPTION обязателен.");
-      const rest = parseUnorderedFields(fields.slice(2), {
+      // B supports two forms:
+      // - B\CAPTION[\...fields...]
+      // - B\ICON:...[\...fields...]   (icon-only button; caption is empty)
+      let caption = get(1);
+      let restTokens = fields.slice(2);
+      if (isIconToken(caption)) {
+        caption = "";
+        restTokens = fields.slice(1); // include ICON:... token itself
+      }
+      if (!String(caption).trim() && restTokens.length === 0) {
+        throw formatError("B", 'Нужен CAPTION или ICON:... (например "B\\Кнопка" или "B\\ICON:home").');
+      }
+      const rest = parseUnorderedFields(restTokens, {
         allowSize: true,
         allowAlign: true,
         allowAction: true,
@@ -634,6 +644,9 @@
         allowRadius: true,
         allowIcon: true,
       });
+      if (!String(caption).trim() && !String(rest.iconName || "").trim()) {
+        throw formatError("B", 'Нужен CAPTION или ICON:... (например "B\\Кнопка" или "B\\ICON:home").');
+      }
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const actionStr = rest.actionStr;
@@ -1237,7 +1250,8 @@
           if (ico) nodeEl.append(ico);
         }
         if (Number.isFinite(node.iconSize)) nodeEl.style.setProperty("--uxl-icon-size", `${node.iconSize}px`);
-        nodeEl.append(el("span", { class: "uxl-B__label", text: node.caption || "" }));
+        const cap = String(node.caption || "");
+        if (cap.trim()) nodeEl.append(el("span", { class: "uxl-B__label", text: cap }));
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;
       } else if (tag === "T") {
