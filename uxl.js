@@ -2209,7 +2209,7 @@
     }
 
     // Prototype page styles
-    document.body.style.background = view === "fullscreen" ? "#ffffff" : "#2b2b2b";
+    document.body.style.background = view === "fullscreen" ? "#e2e2e2" : "#2b2b2b";
     document.body.style.margin = "0";
     document.body.style.overflow = "hidden";
     document.body.style.width = "100vw";
