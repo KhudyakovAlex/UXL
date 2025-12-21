@@ -1271,12 +1271,16 @@
           // Container child (F) size depends on its own kids, so recurse.
           intrinsic = layoutContainer(chNode, chEl, curW, curH, { root: false });
         } else {
+          const isPercentW = chNode.size?.w?.unit === "%";
+          const isPercentH = chNode.size?.h?.unit === "%";
+
           // Apply fixed-size constraints (crop/scroll) BEFORE measuring intrinsic.
           // This is critical for cases like width=100C with long caption: height must be measured after wrapping.
           const wOverflow = chNode.size?.w?.overflow || null;
           const hOverflow = chNode.size?.h?.overflow || null;
-          const constrainW = !!wOverflow;
-          const constrainH = !!hOverflow;
+          // Percent sizes behave like "fill": constrain the box to the computed size so content can wrap/shrink.
+          const constrainW = !!wOverflow || isPercentW;
+          const constrainH = !!hOverflow || isPercentH;
           if (chEl) {
             if (constrainW && baseSz.w != null) chEl.style.width = `${baseSz.w}px`;
             else chEl.style.width = "";
@@ -1288,18 +1292,21 @@
 
         const ow = chNode.size?.w?.overflow || null;
         const oh = chNode.size?.h?.overflow || null;
+        const isPercentW = chNode.size?.w?.unit === "%";
+        const isPercentH = chNode.size?.h?.unit === "%";
 
         // Apply overflow styles to element itself (affects its content).
         if (chEl) setOverflowStyles(chEl, chNode.size?.w || null, chNode.size?.h || null);
 
         // Default behavior: if content doesn't fit explicit size, element expands (unless C/S).
+        // NOTE: Percent sizes are treated as "fill" (fixed), not as a minimum. This prevents 100%+margin overflow.
         const wFinal = chNode.size?.w
-          ? ow
+          ? ow || isPercentW
             ? baseSz.w ?? 0
             : Math.max(baseSz.w ?? 0, intrinsic.w)
           : intrinsic.w;
         const hFinal = chNode.size?.h
-          ? oh
+          ? oh || isPercentH
             ? baseSz.h ?? 0
             : Math.max(baseSz.h ?? 0, intrinsic.h)
           : intrinsic.h;
