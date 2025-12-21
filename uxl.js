@@ -393,12 +393,14 @@
     }
 
     const BUILTIN_BUTTON_ICONS = Object.freeze([
+      "ai",
       "back",
       "chevron-left",
       "chevron-right",
       "close",
       "edit",
       "home",
+      "microphone",
       "plus",
       "search",
       "settings",
@@ -1129,12 +1131,32 @@
   }
 
   const BUILTIN_SVG_ICONS = Object.freeze({
+    ai: {
+      viewBox: "0 0 24 24",
+      d: [
+        // Simple "AI" monogram in line style
+        "M7 18l2.5-12L12 18",
+        "M8.4 14h3.2",
+        "M14.5 6v12",
+        "M14.5 6h3.5",
+        "M14.5 18h3.5",
+      ],
+    },
     back: { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6", "M9 12h12"] },
     "chevron-left": { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6"] },
     "chevron-right": { viewBox: "0 0 24 24", d: ["M9 6l6 6-6 6"] },
     close: { viewBox: "0 0 24 24", d: ["M6 6l12 12", "M18 6l-12 12"] },
     edit: { viewBox: "0 0 24 24", d: ["M4 20h4l10.5-10.5-4-4L4 16v4z", "M13.5 6.5l4 4"] },
     home: { viewBox: "0 0 24 24", d: ["M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"] },
+    microphone: {
+      viewBox: "0 0 24 24",
+      d: [
+        "M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z",
+        "M19 11a7 7 0 0 1-14 0",
+        "M12 18v3",
+        "M8 21h8",
+      ],
+    },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
     search: { viewBox: "0 0 24 24", d: ["M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15z", "M16.5 16.5 21 21"] },
     settings: {
