@@ -561,7 +561,7 @@
       const common = parseCommon({ caption, sizeStr, alignStr, actionStr, hint });
       return {
         indent,
-        node: { tag, id: "", padding: rest.paddingPx ?? 0, margin: rest.marginPx ?? 0, ...common, rawLineNo: lineNo },
+        node: { tag, id: "", padding: rest.paddingPx ?? 3, margin: rest.marginPx ?? 5, ...common, rawLineNo: lineNo },
       };
     }
 
@@ -584,7 +584,7 @@
       // C ACTION is not meaningful; strict/permissive behavior is enforced in parseAction.
       return {
         indent,
-        node: { tag, id: "", padding: rest.paddingPx ?? 0, margin: rest.marginPx ?? 0, ...common, rawLineNo: lineNo },
+        node: { tag, id: "", padding: rest.paddingPx ?? 3, margin: rest.marginPx ?? 5, ...common, rawLineNo: lineNo },
       };
     }
 
@@ -625,7 +625,7 @@
           id: "",
           colsSpec: rest.colsSpec || "",
           margin: rest.marginPx ?? 0,
-          cellPadding: rest.paddingPx ?? 0,
+          cellPadding: rest.paddingPx ?? 5,
           ...common,
         rawLineNo: lineNo,
       },
