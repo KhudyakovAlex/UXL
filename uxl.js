@@ -1089,10 +1089,17 @@
     return root;
   }
 
-  function resolveDim(dim, parentPx) {
+  function resolveDim(dim, parentPx, { marginPx = 0 } = {}) {
     if (!dim) return null;
     if (dim.unit === "px") return dim.value;
-    if (dim.unit === "%") return Math.round((dim.value / 100) * parentPx);
+    if (dim.unit === "%") {
+      const raw = Math.round((dim.value / 100) * parentPx);
+      // Percent sizes are treated as the OUTER box target (like CSS width:100%).
+      // Since we also add margin around elements, subtract it from the border-box
+      // so that (border-box + margins) fits into the parent.
+      const m = Number.isFinite(marginPx) ? marginPx : 0;
+      return Math.max(0, raw - m * 2);
+    }
     return null;
   }
 
@@ -1191,8 +1198,9 @@
     }
 
     function resolveBaseSize(node, parentW, parentH) {
-      const w = node.size?.w ? resolveDim(node.size.w, parentW) : null;
-      const h = node.size?.h ? resolveDim(node.size.h, parentH) : null;
+      const m = Number.isFinite(node.margin) ? node.margin : 0;
+      const w = node.size?.w ? resolveDim(node.size.w, parentW, { marginPx: m }) : null;
+      const h = node.size?.h ? resolveDim(node.size.h, parentH, { marginPx: m }) : null;
       return { w, h };
     }
 
