@@ -318,7 +318,10 @@
         case "F":
           return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
         case "B":
-          return { format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/M10/P10/HINT...] (поля в любом порядке)", example: "B\\Кнопка\\100x\\RB\\P8\\M6\\GOTO:users\\Назад" };
+          return {
+            format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/ICON:NAME/M10/P10/R6/HINT...] (поля в любом порядке)",
+            example: "B\\Кнопка\\ICON:search\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
+          };
         case "C":
           return { format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\P6\\M4\\Подсказка" };
         case "T":
@@ -375,6 +378,11 @@
       return v.startsWith("COLS:");
     }
 
+    function isIconToken(s) {
+      const v = String(s || "").trim();
+      return /^ICON:/i.test(v);
+    }
+
     function parseIntNonNegative(raw, metaForErr, what) {
       const n = Number.parseInt(String(raw), 10);
       if (!Number.isFinite(n) || String(n) !== String(raw).trim()) {
@@ -383,6 +391,18 @@
       if (n < 0) throw new UxlParseError(`${what} должно быть >= 0.`, metaForErr);
       return n;
     }
+
+    const BUILTIN_BUTTON_ICONS = Object.freeze([
+      "back",
+      "chevron-left",
+      "chevron-right",
+      "close",
+      "edit",
+      "home",
+      "plus",
+      "search",
+      "settings",
+    ]);
 
     function isMarginToken(s) {
       const v = String(s || "").trim();
@@ -410,6 +430,7 @@
         allowMargin = false,
         allowPadding = false,
         allowRadius = false,
+        allowIcon = false,
       } = {},
     ) {
       let sizeStr = "";
@@ -420,6 +441,7 @@
       let marginPx = null;
       let paddingPx = null;
       let radiusPx = null;
+      let iconName = "";
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -462,6 +484,11 @@
           radiusPx = val;
           return;
         }
+        if (kind === "icon") {
+          if (iconName) throw formatError(tag, "ICON указан более одного раза.");
+          iconName = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -476,6 +503,9 @@
         if (isRadiusToken(v) && !allowRadius) {
           throw formatError(tag, `Поле "${v}" (radius) не поддерживается для этого тега.`);
         }
+        if (isIconToken(v) && !allowIcon) {
+          throw formatError(tag, `Поле "${v}" (icon) не поддерживается для этого тега.`);
+        }
         if (allowMargin && isMarginToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "MARGIN");
           setOnce("margin", n);
@@ -489,6 +519,18 @@
         if (allowRadius && isRadiusToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "RADIUS");
           setOnce("radius", n);
+          continue;
+        }
+        if (allowIcon && isIconToken(v)) {
+          const name = String(v.slice("ICON:".length)).trim().toLowerCase();
+          if (!name) throw formatError(tag, `ICON должен быть вида "ICON:NAME", например "ICON:search".`);
+          if (!BUILTIN_BUTTON_ICONS.includes(name)) {
+            throw formatError(
+              tag,
+              `Неизвестная иконка "${name}". Разрешены: ${BUILTIN_BUTTON_ICONS.join(", ")}.`,
+            );
+          }
+          setOnce("icon", name);
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -513,7 +555,7 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
-      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx };
+      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx, iconName };
     }
 
     if (tag === "P") {
@@ -574,6 +616,7 @@
         allowMargin: true,
         allowPadding: true,
         allowRadius: true,
+        allowIcon: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -588,6 +631,7 @@
           padding: rest.paddingPx ?? 5,
           margin: rest.marginPx ?? 3,
           radius: rest.radiusPx ?? 6,
+          icon: rest.iconName || "",
           ...common,
           rawLineNo: lineNo,
         },
@@ -1054,6 +1098,50 @@
     return node;
   }
 
+  const BUILTIN_SVG_ICONS = Object.freeze({
+    back: { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6", "M9 12h12"] },
+    "chevron-left": { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6"] },
+    "chevron-right": { viewBox: "0 0 24 24", d: ["M9 6l6 6-6 6"] },
+    close: { viewBox: "0 0 24 24", d: ["M6 6l12 12", "M18 6l-12 12"] },
+    edit: { viewBox: "0 0 24 24", d: ["M4 20h4l10.5-10.5-4-4L4 16v4z", "M13.5 6.5l4 4"] },
+    home: { viewBox: "0 0 24 24", d: ["M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"] },
+    plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
+    search: { viewBox: "0 0 24 24", d: ["M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15z", "M16.5 16.5 21 21"] },
+    settings: {
+      viewBox: "0 0 24 24",
+      d: [
+        "M12 8.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 0 0 0-7z",
+        "M19.4 15a7.9 7.9 0 0 0 .1-2l2-1.2-2-3.4-2.3.7a7.8 7.8 0 0 0-1.7-1l-.3-2.4h-4l-.3 2.4a7.8 7.8 0 0 0-1.7 1l-2.3-.7-2 3.4 2 1.2a7.9 7.9 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.7a7.8 7.8 0 0 0 1.7 1l.3 2.4h4l.3-2.4a7.8 7.8 0 0 0 1.7-1l2.3.7 2-3.4z",
+      ],
+    },
+  });
+
+  function svgIcon(name, { className = "", title = "" } = {}) {
+    const spec = BUILTIN_SVG_ICONS[String(name || "").trim().toLowerCase()];
+    if (!spec) return null;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", spec.viewBox || "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    if (className) svg.setAttribute("class", className);
+    if (title) {
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      t.textContent = title;
+      svg.append(t);
+    }
+    for (const d of spec.d || []) {
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", d);
+      svg.append(p);
+    }
+    return svg;
+  }
+
   function formatMapCaption(caption) {
     const s = String(caption || "").trim();
     if (!s) return "";
@@ -1125,7 +1213,13 @@
 
       if (tag === "C") nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
       else if (tag === "B") {
-        nodeEl = el("button", { class: "uxl-node uxl-B", type: "button", "data-uxl-uid": node.uid, text: node.caption || "" });
+        nodeEl = el("button", { class: "uxl-node uxl-B", type: "button", "data-uxl-uid": node.uid });
+        const iconName = String(node.icon || "").trim();
+        if (iconName) {
+          const ico = svgIcon(iconName, { className: "uxl-B__icon" });
+          if (ico) nodeEl.append(ico);
+        }
+        nodeEl.append(el("span", { class: "uxl-B__label", text: node.caption || "" }));
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;
       } else if (tag === "T") {
