@@ -221,7 +221,7 @@ ALIGN задаёт выравнивание по горизонтали и ве�
 - `ALIGN`: содержит только `L/R/T/B` (без `LR` и `TB`)
 - `ACTION`: начинается с `GOTO:`
 - `ICON:NAME`: встроенная пиктограмма слева от текста (без внешних файлов)
-  - доступные `NAME`: `ai`, `back`, `chevron-left`, `chevron-right`, `close`, `edit`, `home`, `microphone`, `plus`, `search`, `settings`
+  - доступные `NAME`: `ai`, `arrow-left`, `arrow-right`, `back`, `box`, `chevron-left`, `chevron-right`, `close`, `codepen`, `cpu`, `edit`, `grid`, `home`, `microphone`, `plus`, `search`, `sun`, `settings`, `trash`, `volume-2`
   - опционально можно задать размер в px: `ICON:search:18` (диапазон 8..48)
 - `M<number>`: margin кнопки
 - `P<number>`: padding кнопки
@@ -235,16 +235,25 @@ ALIGN задаёт выравнивание по горизонтали и ве�
 Имена (для поля `ICON:...`):
 
 - `ai`
+- `arrow-left`
+- `arrow-right`
 - `back`
+- `box`
 - `chevron-left`
 - `chevron-right`
 - `close`
+- `codepen`
+- `cpu`
 - `edit`
+- `grid`
 - `home`
 - `microphone`
 - `plus`
 - `search`
+- `sun`
 - `settings`
+- `trash`
+- `volume-2`
 
 Быстрые примеры (копипаст):
 
@@ -254,16 +263,25 @@ ALIGN задаёт выравнивание по горизонтали и ве�
 P\icons\ICON names
   F\100%x100%\LT\P10
     B\ai\ICON:ai\120x28\LT
+    B\arrow-left\ICON:arrow-left\120x28\LT
+    B\arrow-right\ICON:arrow-right\120x28\LT
     B\back\ICON:back\120x28\LT
+    B\box\ICON:box\120x28\LT
     B\chevron-left\ICON:chevron-left\120x28\LT
     B\chevron-right\ICON:chevron-right\120x28\LT
     B\close\ICON:close\120x28\LT
+    B\codepen\ICON:codepen\120x28\LT
+    B\cpu\ICON:cpu\120x28\LT
     B\edit\ICON:edit\120x28\LT
+    B\grid\ICON:grid\120x28\LT
     B\home\ICON:home\120x28\LT
     B\microphone\ICON:microphone\120x28\LT
     B\plus\ICON:plus\120x28\LT
     B\search\ICON:search\120x28\LT
+    B\sun\ICON:sun\120x28\LT
     B\settings\ICON:settings\120x28\LT
+    B\trash\ICON:trash\120x28\LT
+    B\volume-2\ICON:volume-2\120x28\LT
 ```
 ````
 

@@ -394,16 +394,25 @@
 
     const BUILTIN_BUTTON_ICONS = Object.freeze([
       "ai",
+      "arrow-left",
+      "arrow-right",
       "back",
+      "box",
       "chevron-left",
       "chevron-right",
       "close",
+      "codepen",
+      "cpu",
       "edit",
+      "grid",
       "home",
       "microphone",
       "plus",
       "search",
+      "sun",
       "settings",
+      "trash",
+      "volume-2",
     ]);
 
     function isMarginToken(s) {
@@ -1156,10 +1165,72 @@
       ],
     },
     back: { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6", "M9 12h12"] },
+    "arrow-left": {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "line", attrs: { x1: "19", y1: "12", x2: "5", y2: "12" } },
+        { tag: "polyline", attrs: { points: "12 19 5 12 12 5" } },
+      ],
+    },
+    "arrow-right": {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "line", attrs: { x1: "5", y1: "12", x2: "19", y2: "12" } },
+        { tag: "polyline", attrs: { points: "12 5 19 12 12 19" } },
+      ],
+    },
     "chevron-left": { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6"] },
     "chevron-right": { viewBox: "0 0 24 24", d: ["M9 6l6 6-6 6"] },
     close: { viewBox: "0 0 24 24", d: ["M6 6l12 12", "M18 6l-12 12"] },
-    edit: { viewBox: "0 0 24 24", d: ["M4 20h4l10.5-10.5-4-4L4 16v4z", "M13.5 6.5l4 4"] },
+    box: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "path", attrs: { d: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" } },
+        { tag: "polyline", attrs: { points: "3.27 6.96 12 12.01 20.73 6.96" } },
+        { tag: "line", attrs: { x1: "12", y1: "22.08", x2: "12", y2: "12" } },
+      ],
+    },
+    codepen: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "polygon", attrs: { points: "12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" } },
+        { tag: "line", attrs: { x1: "12", y1: "22", x2: "12", y2: "15.5" } },
+        { tag: "polyline", attrs: { points: "22 8.5 12 15.5 2 8.5" } },
+        { tag: "polyline", attrs: { points: "2 15.5 12 8.5 22 15.5" } },
+        { tag: "line", attrs: { x1: "12", y1: "2", x2: "12", y2: "8.5" } },
+      ],
+    },
+    cpu: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "rect", attrs: { x: "4", y: "4", width: "16", height: "16", rx: "2", ry: "2" } },
+        { tag: "rect", attrs: { x: "9", y: "9", width: "6", height: "6" } },
+        { tag: "line", attrs: { x1: "9", y1: "1", x2: "9", y2: "4" } },
+        { tag: "line", attrs: { x1: "15", y1: "1", x2: "15", y2: "4" } },
+        { tag: "line", attrs: { x1: "9", y1: "20", x2: "9", y2: "23" } },
+        { tag: "line", attrs: { x1: "15", y1: "20", x2: "15", y2: "23" } },
+        { tag: "line", attrs: { x1: "20", y1: "9", x2: "23", y2: "9" } },
+        { tag: "line", attrs: { x1: "20", y1: "14", x2: "23", y2: "14" } },
+        { tag: "line", attrs: { x1: "1", y1: "9", x2: "4", y2: "9" } },
+        { tag: "line", attrs: { x1: "1", y1: "14", x2: "4", y2: "14" } },
+      ],
+    },
+    edit: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "path", attrs: { d: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" } },
+        { tag: "path", attrs: { d: "M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" } },
+      ],
+    },
+    grid: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "rect", attrs: { x: "3", y: "3", width: "7", height: "7" } },
+        { tag: "rect", attrs: { x: "14", y: "3", width: "7", height: "7" } },
+        { tag: "rect", attrs: { x: "14", y: "14", width: "7", height: "7" } },
+        { tag: "rect", attrs: { x: "3", y: "14", width: "7", height: "7" } },
+      ],
+    },
     home: { viewBox: "0 0 24 24", d: ["M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"] },
     microphone: {
       viewBox: "0 0 24 24",
@@ -1172,11 +1243,44 @@
     },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
     search: { viewBox: "0 0 24 24", d: ["M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15z", "M16.5 16.5 21 21"] },
+    sun: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "circle", attrs: { cx: "12", cy: "12", r: "5" } },
+        { tag: "line", attrs: { x1: "12", y1: "1", x2: "12", y2: "3" } },
+        { tag: "line", attrs: { x1: "12", y1: "21", x2: "12", y2: "23" } },
+        { tag: "line", attrs: { x1: "4.22", y1: "4.22", x2: "5.64", y2: "5.64" } },
+        { tag: "line", attrs: { x1: "18.36", y1: "18.36", x2: "19.78", y2: "19.78" } },
+        { tag: "line", attrs: { x1: "1", y1: "12", x2: "3", y2: "12" } },
+        { tag: "line", attrs: { x1: "21", y1: "12", x2: "23", y2: "12" } },
+        { tag: "line", attrs: { x1: "4.22", y1: "19.78", x2: "5.64", y2: "18.36" } },
+        { tag: "line", attrs: { x1: "18.36", y1: "5.64", x2: "19.78", y2: "4.22" } },
+      ],
+    },
     settings: {
       viewBox: "0 0 24 24",
-      d: [
-        "M12 8.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 0 0 0-7z",
-        "M19.4 15a7.9 7.9 0 0 0 .1-2l2-1.2-2-3.4-2.3.7a7.8 7.8 0 0 0-1.7-1l-.3-2.4h-4l-.3 2.4a7.8 7.8 0 0 0-1.7 1l-2.3-.7-2 3.4 2 1.2a7.9 7.9 0 0 0 .1 2l-2 1.2 2 3.4 2.3-.7a7.8 7.8 0 0 0 1.7 1l.3 2.4h4l.3-2.4a7.8 7.8 0 0 0 1.7-1l2.3.7 2-3.4z",
+      els: [
+        { tag: "circle", attrs: { cx: "12", cy: "12", r: "3" } },
+        {
+          tag: "path",
+          attrs: {
+            d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z",
+          },
+        },
+      ],
+    },
+    trash: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "polyline", attrs: { points: "3 6 5 6 21 6" } },
+        { tag: "path", attrs: { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" } },
+      ],
+    },
+    "volume-2": {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "polygon", attrs: { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" } },
+        { tag: "path", attrs: { d: "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" } },
       ],
     },
   });
@@ -1205,7 +1309,17 @@
       t.textContent = title;
       svg.append(t);
     }
-    if (Array.isArray(spec.paths)) {
+    if (Array.isArray(spec.els)) {
+      for (const elSpec of spec.els) {
+        if (!elSpec || !elSpec.tag) continue;
+        const n = document.createElementNS("http://www.w3.org/2000/svg", String(elSpec.tag));
+        for (const [k, v] of Object.entries(elSpec.attrs || {})) {
+          if (v == null) continue;
+          n.setAttribute(k, String(v));
+        }
+        svg.append(n);
+      }
+    } else if (Array.isArray(spec.paths)) {
       for (const pp of spec.paths) {
         if (!pp || !pp.d) continue;
         const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
