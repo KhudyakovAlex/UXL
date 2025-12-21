@@ -359,8 +359,12 @@
 
     function isSizeToken(s) {
       const v = String(s || "").trim();
-      // SIZE always has an 'x' separator (partial forms also include x).
-      return v.includes("x") || v.includes("X");
+      // SIZE must look like WxH (partial forms allowed: Wx / xH), with optional % and overflow suffix C/S.
+      // We intentionally do NOT treat arbitrary text containing "x" as SIZE (e.g. hints like "xH, aspect").
+      // Examples: "100x", "x20", "50%x30%S", "100Cx"
+      if (!v) return false;
+      if (/\s/.test(v)) return false;
+      return /^(\d+%?[CS]?)?[xX](\d+%?[CS]?)?$/.test(v) && v.toLowerCase() !== "x";
     }
 
     function isAlignToken(s) {
@@ -841,18 +845,18 @@
       const alignStr = rest.alignStr;
       const hint = rest.hint;
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
-      return {
-        indent,
-        node: {
-          tag,
+    return {
+      indent,
+      node: {
+        tag,
           id: "",
           src,
           fit: rest.fitMode || "none",
           margin: rest.marginPx ?? 0,
           ...common,
-          rawLineNo: lineNo,
-        },
-      };
+        rawLineNo: lineNo,
+      },
+    };
     }
 
     if (tag === "T") {
