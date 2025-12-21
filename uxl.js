@@ -394,6 +394,11 @@
       return /^P\d+$/i.test(v);
     }
 
+    function isRadiusToken(s) {
+      const v = String(s || "").trim();
+      return /^R\d+$/i.test(v);
+    }
+
     function parseUnorderedFields(
       tokens,
       {
@@ -404,6 +409,7 @@
         allowCols = false,
         allowMargin = false,
         allowPadding = false,
+        allowRadius = false,
       } = {},
     ) {
       let sizeStr = "";
@@ -413,6 +419,7 @@
       let colsSpec = "";
       let marginPx = null;
       let paddingPx = null;
+      let radiusPx = null;
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -450,6 +457,11 @@
           paddingPx = val;
           return;
         }
+        if (kind === "radius") {
+          if (radiusPx != null) throw formatError(tag, "RADIUS указан более одного раза.");
+          radiusPx = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -461,6 +473,9 @@
         if (isPaddingToken(v) && !allowPadding) {
           throw formatError(tag, `Поле "${v}" (padding) не поддерживается для этого тега.`);
         }
+        if (isRadiusToken(v) && !allowRadius) {
+          throw formatError(tag, `Поле "${v}" (radius) не поддерживается для этого тега.`);
+        }
         if (allowMargin && isMarginToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "MARGIN");
           setOnce("margin", n);
@@ -469,6 +484,11 @@
         if (allowPadding && isPaddingToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "PADDING");
           setOnce("padding", n);
+          continue;
+        }
+        if (allowRadius && isRadiusToken(v)) {
+          const n = parseIntNonNegative(v.slice(1), meta, "RADIUS");
+          setOnce("radius", n);
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -493,7 +513,7 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
-      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx };
+      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx };
     }
 
     if (tag === "P") {
@@ -553,6 +573,7 @@
         allowHint: true,
         allowMargin: true,
         allowPadding: true,
+        allowRadius: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -561,7 +582,15 @@
       const common = parseCommon({ caption, sizeStr, alignStr, actionStr, hint });
       return {
         indent,
-        node: { tag, id: "", padding: rest.paddingPx ?? 3, margin: rest.marginPx ?? 5, ...common, rawLineNo: lineNo },
+        node: {
+          tag,
+          id: "",
+          padding: rest.paddingPx ?? 5,
+          margin: rest.marginPx ?? 3,
+          radius: rest.radiusPx ?? 6,
+          ...common,
+          rawLineNo: lineNo,
+        },
       };
     }
 
@@ -584,7 +613,7 @@
       // C ACTION is not meaningful; strict/permissive behavior is enforced in parseAction.
       return {
         indent,
-        node: { tag, id: "", padding: rest.paddingPx ?? 3, margin: rest.marginPx ?? 5, ...common, rawLineNo: lineNo },
+        node: { tag, id: "", padding: rest.paddingPx ?? 5, margin: rest.marginPx ?? 3, ...common, rawLineNo: lineNo },
       };
     }
 
@@ -1090,6 +1119,8 @@
       if (tag === "C") nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
       else if (tag === "B") {
         nodeEl = el("button", { class: "uxl-node uxl-B", type: "button", "data-uxl-uid": node.uid, text: node.caption || "" });
+        const r = Number.isFinite(node.radius) ? node.radius : 6;
+        nodeEl.style.borderRadius = `${r}px`;
       } else if (tag === "T") {
         nodeEl = el("div", { class: "uxl-node uxl-T", "data-uxl-uid": node.uid });
         nodeEl.style.setProperty("--uxl-table-cell-pad", `${Number.isFinite(node.cellPadding) ? node.cellPadding : 0}px`);
