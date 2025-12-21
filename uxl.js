@@ -317,6 +317,11 @@
           };
         case "F":
           return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
+        case "I":
+          return {
+            format: "I\\SRC:<url>\\[SIZE/ALIGN/FIT:contain|cover/M10/HINT...] (поля в любом порядке; без PADDING)",
+            example: "I\\SRC:src/yarmap.PNG\\200x\\LT\\M6\\FIT:contain\\Подсказка картинки",
+          };
         case "B":
           return {
             format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
@@ -383,6 +388,16 @@
       return /^ICON:/i.test(v);
     }
 
+    function isSrcToken(s) {
+      const v = String(s || "").trim();
+      return /^SRC:/i.test(v);
+    }
+
+    function isFitToken(s) {
+      const v = String(s || "").trim().toUpperCase();
+      return v.startsWith("FIT:");
+    }
+
     function isBgToken(s) {
       const v = String(s || "").trim();
       return /^BG:/i.test(v);
@@ -447,6 +462,8 @@
         allowPadding = false,
         allowRadius = false,
         allowIcon = false,
+        allowSrc = false,
+        allowFit = false,
         allowBg = false,
       } = {},
     ) {
@@ -460,6 +477,8 @@
       let radiusPx = null;
       let iconName = "";
       let iconSizePx = null;
+      let srcUrl = "";
+      let fitMode = "";
       let bgUrl = "";
 
       const setOnce = (kind, val) => {
@@ -518,6 +537,16 @@
           bgUrl = val;
           return;
         }
+        if (kind === "src") {
+          if (srcUrl) throw formatError(tag, "SRC указан более одного раза.");
+          srcUrl = val;
+          return;
+        }
+        if (kind === "fit") {
+          if (fitMode) throw formatError(tag, "FIT указан более одного раза.");
+          fitMode = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -534,6 +563,12 @@
         }
         if (isIconToken(v) && !allowIcon) {
           throw formatError(tag, `Поле "${v}" (icon) не поддерживается для этого тега.`);
+        }
+        if (isSrcToken(v) && !allowSrc) {
+          throw formatError(tag, `Поле "${v}" (src) не поддерживается для этого тега.`);
+        }
+        if (isFitToken(v) && !allowFit) {
+          throw formatError(tag, `Поле "${v}" (fit) не поддерживается для этого тега.`);
         }
         if (isBgToken(v) && !allowBg) {
           throw formatError(tag, `Поле "${v}" (bg) не поддерживается для этого тега.`);
@@ -581,6 +616,20 @@
           setOnce("bg", url);
           continue;
         }
+        if (allowSrc && isSrcToken(v)) {
+          const url = String(v.slice("SRC:".length)).trim();
+          if (!url) throw formatError(tag, `SRC должен быть вида "SRC:src/yarmap.PNG" (URL не может быть пустым).`);
+          setOnce("src", url);
+          continue;
+        }
+        if (allowFit && isFitToken(v)) {
+          const raw = String(v.slice("FIT:".length)).trim().toLowerCase();
+          if (raw !== "contain" && raw !== "cover") {
+            throw formatError(tag, 'FIT должен быть "FIT:contain" или "FIT:cover".');
+          }
+          setOnce("fit", raw);
+          continue;
+        }
         if (allowCols && isColsToken(v)) {
           setOnce("cols", v);
           continue;
@@ -603,7 +652,21 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
-      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx, iconName, iconSizePx, bgUrl };
+      return {
+        sizeStr,
+        alignStr,
+        actionStr,
+        hint,
+        colsSpec,
+        marginPx,
+        paddingPx,
+        radiusPx,
+        iconName,
+        iconSizePx,
+        srcUrl,
+        fitMode,
+        bgUrl,
+      };
     }
 
     if (tag === "P") {
@@ -731,6 +794,8 @@
         allowHint: true,
         allowMargin: false,
         allowPadding: true,
+        allowSrc: false,
+        allowFit: false,
         allowBg: true,
       });
       const sizeStr = rest.sizeStr;
@@ -739,6 +804,41 @@
       const bg = rest.bgUrl || "";
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
       return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, bg, ...common, rawLineNo: lineNo } };
+    }
+
+    if (tag === "I") {
+      const rest = parseUnorderedFields(fields.slice(1), {
+        allowSize: true,
+        allowAlign: true,
+        allowAction: false,
+        allowHint: true,
+        allowCols: false,
+        allowMargin: true,
+        allowPadding: false,
+        allowRadius: false,
+        allowIcon: false,
+        allowSrc: true,
+        allowFit: true,
+        allowBg: false,
+      });
+      const src = String(rest.srcUrl || "").trim();
+      if (!src) throw formatError("I", 'SRC обязателен (например "I\\SRC:src/yarmap.PNG").');
+      const sizeStr = rest.sizeStr;
+      const alignStr = rest.alignStr;
+      const hint = rest.hint;
+      const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
+      return {
+        indent,
+        node: {
+          tag,
+          id: "",
+          src,
+          fit: rest.fitMode || "none",
+          margin: rest.marginPx ?? 0,
+          ...common,
+          rawLineNo: lineNo,
+        },
+      };
     }
 
     if (tag === "T") {
@@ -770,7 +870,7 @@
     }
 
     throw new UxlParseError(
-      `Неизвестный тег: "${tag}". Разрешены: P, F, B, C, T, TH, TD. См. UXL.md для форматов.`,
+      `Неизвестный тег: "${tag}". Разрешены: P, F, I, B, C, T, TH, TD. См. UXL.md для форматов.`,
       meta,
     );
   }
@@ -948,7 +1048,7 @@
           });
         }
         for (const ch of kids) {
-          if (!["F", "B", "C", "T"].includes(ch.tag)) {
+          if (!["F", "B", "C", "T", "I"].includes(ch.tag)) {
             throw new UxlParseError(`Недопустимый дочерний тег "${ch.tag}" внутри P.`, {
               line: ch.rawLineNo,
               col: 1,
@@ -959,7 +1059,7 @@
         }
       } else if (tag === "F") {
         for (const ch of kids) {
-          if (!["F", "B", "C", "T"].includes(ch.tag)) {
+          if (!["F", "B", "C", "T", "I"].includes(ch.tag)) {
             throw new UxlParseError(`Недопустимый дочерний тег "${ch.tag}" внутри F.`, {
               line: ch.rawLineNo,
               col: 1,
@@ -967,6 +1067,15 @@
               lineText: lines[ch.rawLineNo - 1],
             });
           }
+        }
+      } else if (tag === "I" || tag === "B" || tag === "C") {
+        if (kids.length) {
+          throw new UxlParseError(`${tag} не может иметь дочерних элементов.`, {
+            line: node.rawLineNo,
+            col: 1,
+            sourceName,
+            lineText: lines[node.rawLineNo - 1],
+          });
         }
       } else if (tag === "T") {
         for (const ch of kids) {
@@ -1454,6 +1563,21 @@
         if (cap.trim()) nodeEl.append(el("span", { class: "uxl-B__label", text: cap }));
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;
+      } else if (tag === "I") {
+        nodeEl = el("div", { class: "uxl-node uxl-I", "data-uxl-uid": node.uid });
+        const fit = String(node.fit || "").trim().toLowerCase();
+        if (fit === "contain" || fit === "cover") nodeEl.style.setProperty("--uxl-img-fit", fit);
+        const img = document.createElement("img");
+        img.className = "uxl-I__img";
+        img.alt = "";
+        img.decoding = "async";
+        img.loading = "eager";
+        img.src = String(node.src || "");
+        const broken = el("div", { class: "uxl-I__broken", text: "image not found" });
+        img.addEventListener("error", () => {
+          nodeEl.classList.add("uxl-I--broken");
+        });
+        nodeEl.append(img, broken);
       } else if (tag === "T") {
         nodeEl = el("div", { class: "uxl-node uxl-T", "data-uxl-uid": node.uid });
         nodeEl.style.setProperty("--uxl-table-cell-pad", `${Number.isFinite(node.cellPadding) ? node.cellPadding : 0}px`);
@@ -1518,6 +1642,13 @@
     function measureIntrinsic(node) {
       const nodeEl = domByUid.get(node.uid);
       if (!nodeEl) return { w: 0, h: 0 };
+      if (node.tag === "I") {
+        const img = nodeEl.querySelector("img");
+        const broken = nodeEl.classList.contains("uxl-I--broken");
+        if (img && img.naturalWidth > 0 && img.naturalHeight > 0) return { w: img.naturalWidth, h: img.naturalHeight };
+        if (broken) return { w: 64, h: 64 };
+        return { w: 0, h: 0 };
+      }
       // Measure current rendered box (without forcing). This is our intrinsic size baseline.
       const r = nodeEl.getBoundingClientRect();
       return { w: Math.ceil(r.width), h: Math.ceil(r.height) };
@@ -1593,6 +1724,28 @@
         let intrinsic;
 
         const chEl = domByUid.get(chNode.uid);
+        if (tag === "I") {
+          intrinsic = measureIntrinsic(chNode);
+          let w = baseSz.w;
+          let h = baseSz.h;
+
+          // If one axis is missing, compute it from the image aspect ratio.
+          const nw = intrinsic.w || 0;
+          const nh = intrinsic.h || 0;
+          if (w == null && h == null) {
+            w = nw;
+            h = nh;
+          } else if (w != null && h == null) {
+            h = nw > 0 ? Math.round((w * nh) / nw) : nh;
+          } else if (h != null && w == null) {
+            w = nh > 0 ? Math.round((h * nw) / nh) : nw;
+          }
+          if (w == null) w = nw;
+          if (h == null) h = nh;
+
+          const m = Number.isFinite(chNode.margin) ? chNode.margin : 0;
+          return { w: (w ?? 0) + m * 2, h: (h ?? 0) + m * 2, innerW: w ?? 0, innerH: h ?? 0, m };
+        }
         if (isContainerTag(tag)) {
           // Container child (F) size depends on its own kids, so recurse.
           intrinsic = layoutContainer(chNode, chEl, curW, curH, { root: false });
@@ -1825,7 +1978,40 @@
     }
 
     // Defer first layout until the page subtree is attached to DOM, otherwise intrinsic measurements are 0.
-    requestAnimationFrame(() => relayout());
+    function waitForImagesBeforeLayout() {
+      const pending = [];
+      function walk(node) {
+        if (!node) return;
+        if (node.tag === "I") {
+          const needIntrinsic = !node.size || !node.size.w || !node.size.h;
+          if (needIntrinsic) {
+            const eln = domByUid.get(node.uid);
+            const img = eln ? eln.querySelector("img") : null;
+            if (img && !(img.complete && img.naturalWidth > 0)) {
+              pending.push(
+                new Promise((resolve) => {
+                  const done = () => resolve();
+                  img.addEventListener("load", done, { once: true });
+                  img.addEventListener("error", done, { once: true });
+                  if (typeof img.decode === "function") {
+                    img.decode().then(done).catch(done);
+                  }
+                }),
+              );
+            }
+          }
+        }
+        for (const ch of node.children || []) walk(ch);
+      }
+      walk(rootNode);
+      if (!pending.length) return Promise.resolve();
+      // Safety: don't block forever on slow/broken images.
+      return Promise.race([Promise.all(pending), new Promise((r) => setTimeout(r, 1500))]);
+    }
+
+    requestAnimationFrame(() => {
+      waitForImagesBeforeLayout().then(() => relayout());
+    });
 
     return domByUid;
   }
