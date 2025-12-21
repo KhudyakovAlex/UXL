@@ -319,8 +319,8 @@
           return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
         case "I":
           return {
-            format: "I\\SRC:<url>\\[SIZE/ALIGN/FIT:contain|cover/M10/HINT...] (поля в любом порядке; без PADDING)",
-            example: "I\\SRC:src/yarmap.PNG\\200x\\LT\\M6\\FIT:contain\\Подсказка картинки",
+            format: "I\\SRC:<url>\\[SIZE/ALIGN/FIT|CROP/M10/HINT...] (поля в любом порядке; без PADDING)",
+            example: "I\\SRC:src/yarmap.PNG\\200x\\LT\\M6\\FIT\\Подсказка картинки",
           };
         case "B":
           return {
@@ -395,7 +395,12 @@
 
     function isFitToken(s) {
       const v = String(s || "").trim().toUpperCase();
-      return v.startsWith("FIT:");
+      // New syntax:
+      // - FIT  => contain
+      // - CROP => cover
+      // Backward compatible:
+      // - FIT:contain / FIT:cover
+      return v === "FIT" || v === "CROP" || v.startsWith("FIT:");
     }
 
     function isBgToken(s) {
@@ -623,9 +628,18 @@
           continue;
         }
         if (allowFit && isFitToken(v)) {
+          const up = String(v).trim().toUpperCase();
+          if (up === "FIT") {
+            setOnce("fit", "contain");
+            continue;
+          }
+          if (up === "CROP") {
+            setOnce("fit", "cover");
+            continue;
+          }
           const raw = String(v.slice("FIT:".length)).trim().toLowerCase();
           if (raw !== "contain" && raw !== "cover") {
-            throw formatError(tag, 'FIT должен быть "FIT:contain" или "FIT:cover".');
+            throw formatError(tag, 'FIT должен быть "FIT" или "CROP" (или legacy "FIT:contain"/"FIT:cover").');
           }
           setOnce("fit", raw);
           continue;
