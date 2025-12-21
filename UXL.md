@@ -227,6 +227,39 @@ ALIGN задаёт выравнивание по горизонтали и ве�
 - всё остальное — `HINT`
 - Пример: `B\Кнопка`
 
+#### Встроенные иконки для `B` (полный список)
+
+Имена (для поля `ICON:...`):
+
+- `back`
+- `chevron-left`
+- `chevron-right`
+- `close`
+- `edit`
+- `home`
+- `plus`
+- `search`
+- `settings`
+
+Быстрые примеры (копипаст):
+
+````text
+```UXL
+300x220
+P\icons\ICON names
+  F\100%x100%\LT\P10
+    B\back\ICON:back\120x28\LT
+    B\chevron-left\ICON:chevron-left\120x28\LT
+    B\chevron-right\ICON:chevron-right\120x28\LT
+    B\close\ICON:close\120x28\LT
+    B\edit\ICON:edit\120x28\LT
+    B\home\ICON:home\120x28\LT
+    B\plus\ICON:plus\120x28\LT
+    B\search\ICON:search\120x28\LT
+    B\settings\ICON:settings\120x28\LT
+```
+````
+
 Пример (все поля):
 
 - `B\Перейти\ICON:search\RB\140x32\P8\M6\R8\GOTO:users\Открыть страницу users`
