@@ -319,8 +319,8 @@
           return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
         case "B":
           return {
-            format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/ICON:NAME/M10/P10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\Кнопка\\ICON:search\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
+            format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
+            example: "B\\Кнопка\\ICON:search:18\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return { format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\P6\\M4\\Подсказка" };
@@ -442,6 +442,7 @@
       let paddingPx = null;
       let radiusPx = null;
       let iconName = "";
+      let iconSizePx = null;
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -489,6 +490,11 @@
           iconName = val;
           return;
         }
+        if (kind === "iconSize") {
+          if (iconSizePx != null) throw formatError(tag, "ICON size указан более одного раза.");
+          iconSizePx = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -522,8 +528,12 @@
           continue;
         }
         if (allowIcon && isIconToken(v)) {
-          const name = String(v.slice("ICON:".length)).trim().toLowerCase();
-          if (!name) throw formatError(tag, `ICON должен быть вида "ICON:NAME", например "ICON:search".`);
+          const raw = String(v.slice("ICON:".length)).trim();
+          if (!raw) throw formatError(tag, `ICON должен быть вида "ICON:NAME" или "ICON:NAME:16", например "ICON:search:18".`);
+          const parts = raw.split(":").map((s) => s.trim()).filter(Boolean);
+          const name = String(parts[0] || "").toLowerCase();
+          const sizeRaw = parts[1] ?? "";
+          if (!name) throw formatError(tag, `ICON должен быть вида "ICON:NAME" или "ICON:NAME:16", например "ICON:search:18".`);
           if (!BUILTIN_BUTTON_ICONS.includes(name)) {
             throw formatError(
               tag,
@@ -531,6 +541,12 @@
             );
           }
           setOnce("icon", name);
+          if (sizeRaw !== "") {
+            const n = parseIntNonNegative(sizeRaw, meta, "ICON size");
+            // Guard rails: keep it reasonable for buttons.
+            if (n < 8 || n > 48) throw formatError(tag, "ICON size должен быть в диапазоне 8..48 px.");
+            setOnce("iconSize", n);
+          }
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -555,7 +571,7 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
-      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx, iconName };
+      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx, radiusPx, iconName, iconSizePx };
     }
 
     if (tag === "P") {
@@ -632,6 +648,7 @@
           margin: rest.marginPx ?? 3,
           radius: rest.radiusPx ?? 6,
           icon: rest.iconName || "",
+          iconSize: rest.iconSizePx ?? null,
           ...common,
           rawLineNo: lineNo,
         },
@@ -1219,6 +1236,7 @@
           const ico = svgIcon(iconName, { className: "uxl-B__icon" });
           if (ico) nodeEl.append(ico);
         }
+        if (Number.isFinite(node.iconSize)) nodeEl.style.setProperty("--uxl-icon-size", `${node.iconSize}px`);
         nodeEl.append(el("span", { class: "uxl-B__label", text: node.caption || "" }));
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;

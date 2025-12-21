@@ -421,8 +421,8 @@
 }
 
 .uxl-B__icon {
-  width: 14px;
-  height: 14px;
+  width: var(--uxl-icon-size, 14px);
+  height: var(--uxl-icon-size, 14px);
   flex: 0 0 auto;
 }
 

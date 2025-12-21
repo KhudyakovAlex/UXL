@@ -221,6 +221,7 @@ ALIGN задаёт выравнивание по горизонтали и ве�
 - `ACTION`: начинается с `GOTO:`
 - `ICON:NAME`: встроенная пиктограмма слева от текста (без внешних файлов)
   - доступные `NAME`: `back`, `chevron-left`, `chevron-right`, `close`, `edit`, `home`, `plus`, `search`, `settings`
+  - опционально можно задать размер в px: `ICON:search:18` (диапазон 8..48)
 - `M<number>`: margin кнопки
 - `P<number>`: padding кнопки
 - `R<number>`: скругление углов кнопки (border-radius), px
@@ -263,6 +264,7 @@ P\icons\ICON names
 Пример (все поля):
 
 - `B\Перейти\ICON:search\RB\140x32\P8\M6\R8\GOTO:users\Открыть страницу users`
+- `B\Перейти\ICON:search:18\RB\140x32\P8\M6\R8\GOTO:users\Открыть страницу users`
 
 ### C — Надпись
 

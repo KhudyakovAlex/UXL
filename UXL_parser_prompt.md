@@ -63,7 +63,7 @@
 - `SIZE`: содержит `x`
 - `ALIGN`: только `L/R/T/B` (без `LR` и `TB`)
 - `ACTION`: начинается с `GOTO:`
-- `ICON`: `ICON:<name>` (встроенная пиктограмма для `B`, без внешних файлов). Разрешены: back, chevron-left, chevron-right, close, edit, home, plus, search, settings
+- `ICON`: `ICON:<name>[:size]` (встроенная пиктограмма для `B`, без внешних файлов). Пример: `ICON:search:18` (px, 8..48). Разрешены: back, chevron-left, chevron-right, close, edit, home, plus, search, settings
 - `MARGIN`: `M<number>` (целые px, одно значение на все стороны; влияет на layout)
 - `PADDING`: `P<number>` (целые px, одно значение на все стороны; влияет на layout)
 - `RADIUS`: `R<number>` (целые px; пока используется только для `B` как скругление углов)
