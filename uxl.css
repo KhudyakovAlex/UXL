@@ -392,19 +392,20 @@
 }
 
 .uxl-T {
+  --uxl-table-cell-pad: 0px;
   border: 1px solid var(--uxl-border);
   background: var(--uxl-bg);
 }
 
 .uxl-C {
-  padding: 4px 6px;
+  padding: 0;
   color: var(--uxl-text);
   background: transparent;
   white-space: pre-wrap;
 }
 
 .uxl-B {
-  padding: 6px 10px;
+  padding: 0;
   border: 1px solid var(--uxl-border);
   background: var(--uxl-bg);
   cursor: pointer;
@@ -424,7 +425,7 @@
 
 .uxl-T th, .uxl-T td {
   border: 1px solid var(--uxl-border);
-  padding: 6px 8px;
+  padding: var(--uxl-table-cell-pad, 0px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

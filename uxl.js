@@ -196,7 +196,7 @@
       }
       if (mode === "strict") {
         // Guard against invalid combos (e.g. both C and S). Regex already prevents it; keep for clarity.
-      }
+    }
       return { size: { w, h, overflowW, overflowH }, nextIndex: i + 1 };
     }
     return { size: { w: 500, h: 500, overflowW: null, overflowH: null }, nextIndex: lines.length };
@@ -312,17 +312,20 @@
       switch (t) {
         case "P":
           return {
-            format: "P\\CAPTION[\\HINT] или P\\ID\\CAPTION[\\HINT]",
-            example: "P\\users\\Пользователи\\Подсказка страницы",
+            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: P10=padding, HINT)",
+            example: "P\\users\\Пользователи\\P12\\Подсказка страницы",
           };
         case "F":
-          return { format: "F\\[SIZE/ALIGN/ACTION/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\Контейнер" };
+          return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
         case "B":
-          return { format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/HINT...] (поля в любом порядке)", example: "B\\Кнопка\\100x\\RB\\GOTO:users\\Назад" };
+          return { format: "B\\CAPTION\\[SIZE/ALIGN/ACTION/M10/P10/HINT...] (поля в любом порядке)", example: "B\\Кнопка\\100x\\RB\\P8\\M6\\GOTO:users\\Назад" };
         case "C":
-          return { format: "C\\CAPTION\\[SIZE/ALIGN/ACTION/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\Подсказка" };
+          return { format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\P6\\M4\\Подсказка" };
         case "T":
-          return { format: "T\\COLS:...\\[SIZE/ALIGN/HINT...] (поля в любом порядке)", example: "T\\COLS:20R,80L\\100%x100%\\T\\Таблица" };
+          return {
+            format: "T\\COLS:...\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке; P10 задаёт padding ячеек TH/TD)",
+            example: "T\\COLS:20R,80L\\100%x100%\\T\\M10\\P6\\Таблица",
+          };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
         case "TD":
@@ -372,15 +375,44 @@
       return v.startsWith("COLS:");
     }
 
+    function parseIntNonNegative(raw, metaForErr, what) {
+      const n = Number.parseInt(String(raw), 10);
+      if (!Number.isFinite(n) || String(n) !== String(raw).trim()) {
+        throw new UxlParseError(`${what} должно быть целым числом (например ${what === "PADDING" ? "P10" : "M10"}).`, metaForErr);
+      }
+      if (n < 0) throw new UxlParseError(`${what} должно быть >= 0.`, metaForErr);
+      return n;
+    }
+
+    function isMarginToken(s) {
+      const v = String(s || "").trim();
+      return /^M\d+$/i.test(v);
+    }
+
+    function isPaddingToken(s) {
+      const v = String(s || "").trim();
+      return /^P\d+$/i.test(v);
+    }
+
     function parseUnorderedFields(
       tokens,
-      { allowSize = true, allowAlign = true, allowAction = true, allowHint = true, allowCols = false } = {},
+      {
+        allowSize = true,
+        allowAlign = true,
+        allowAction = true,
+        allowHint = true,
+        allowCols = false,
+        allowMargin = false,
+        allowPadding = false,
+      } = {},
     ) {
       let sizeStr = "";
       let alignStr = "";
       let actionStr = "";
       let hint = "";
       let colsSpec = "";
+      let marginPx = null;
+      let paddingPx = null;
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -408,11 +440,37 @@
           hint = val;
           return;
         }
+        if (kind === "margin") {
+          if (marginPx != null) throw formatError(tag, "MARGIN указан более одного раза.");
+          marginPx = val;
+          return;
+        }
+        if (kind === "padding") {
+          if (paddingPx != null) throw formatError(tag, "PADDING указан более одного раза.");
+          paddingPx = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
         const v = String(raw ?? "").trim();
         if (!v) continue;
+        if (isMarginToken(v) && !allowMargin) {
+          throw formatError(tag, `Поле "${v}" (margin) не поддерживается для этого тега.`);
+        }
+        if (isPaddingToken(v) && !allowPadding) {
+          throw formatError(tag, `Поле "${v}" (padding) не поддерживается для этого тега.`);
+        }
+        if (allowMargin && isMarginToken(v)) {
+          const n = parseIntNonNegative(v.slice(1), meta, "MARGIN");
+          setOnce("margin", n);
+          continue;
+        }
+        if (allowPadding && isPaddingToken(v)) {
+          const n = parseIntNonNegative(v.slice(1), meta, "PADDING");
+          setOnce("padding", n);
+          continue;
+        }
         if (allowCols && isColsToken(v)) {
           setOnce("cols", v);
           continue;
@@ -435,52 +493,42 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
-      return { sizeStr, alignStr, actionStr, hint, colsSpec };
+      return { sizeStr, alignStr, actionStr, hint, colsSpec, marginPx, paddingPx };
     }
 
     if (tag === "P") {
       // P supports both forms:
-      // - P\CAPTION[\HINT]
-      // - P\ID\CAPTION[\HINT]  (ID must match [A-Za-z0-9_-]+)
-      // If there are 3 fields and the 2nd does not look like an ID, it's treated as CAPTION and the 3rd as HINT.
+      // - P\CAPTION[\...поля...]
+      // - P\ID\CAPTION[\...поля...]  (ID must match [A-Za-z0-9_-]+)
+      // Additional fields are unordered; supported: P10 (padding), HINT.
       let id = "";
       let caption = "";
-      let hint = "";
-
       const idRe = /^[A-Za-z0-9_-]+$/;
 
-      if (fields.length >= 5) {
-        if (mode === "strict") throw formatError("P", "Слишком много полей.");
-        // permissive: ignore extras
+      let restTokens = [];
+      const f1 = get(1);
+      const f2 = get(2);
+      if (fields.length >= 3 && idRe.test(String(f1).trim())) {
+        id = f1;
+        caption = f2;
+        restTokens = fields.slice(3);
+      } else {
+        caption = f1;
+        restTokens = fields.slice(2);
       }
 
-      if (fields.length === 4) {
-        // Either P\ID\CAPTION\HINT or P\CAPTION\HINT\(extra ignored)
-        const f1 = get(1);
-        if (idRe.test(String(f1).trim())) {
-          id = f1;
-          caption = get(2);
-          hint = get(3);
-        } else {
-          caption = f1;
-          hint = get(2);
-        }
-      } else if (fields.length === 3) {
-        const f1 = get(1);
-        if (idRe.test(String(f1).trim())) {
-          id = f1;
-          caption = get(2);
-        } else {
-          caption = f1;
-          hint = get(2);
-        }
-      } else if (fields.length === 2) {
-        caption = get(1);
-      } else if (fields.length === 1) {
-        // P without caption is allowed (renders as "P" or "P <ID>" if ID exists).
-      }
-
-      return { indent, node: { tag, id, caption, size: null, align: null, action: null, hint: hint || "", rawLineNo: lineNo } };
+      const rest = parseUnorderedFields(restTokens, {
+        allowSize: false,
+        allowAlign: false,
+        allowAction: false,
+        allowHint: true,
+        allowCols: false,
+        allowMargin: false,
+        allowPadding: true,
+      });
+      const hint = rest.hint || "";
+      const padding = rest.paddingPx ?? 0;
+      return { indent, node: { tag, id, caption, padding, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -498,44 +546,90 @@
     if (tag === "B") {
       const caption = get(1);
       if (!String(caption).trim()) throw formatError("B", "CAPTION обязателен.");
-      const rest = parseUnorderedFields(fields.slice(2), { allowSize: true, allowAlign: true, allowAction: true, allowHint: true });
+      const rest = parseUnorderedFields(fields.slice(2), {
+        allowSize: true,
+        allowAlign: true,
+        allowAction: true,
+        allowHint: true,
+        allowMargin: true,
+        allowPadding: true,
+      });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const actionStr = rest.actionStr;
       const hint = rest.hint;
       const common = parseCommon({ caption, sizeStr, alignStr, actionStr, hint });
-      return { indent, node: { tag, id: "", ...common, rawLineNo: lineNo } };
+      return {
+        indent,
+        node: { tag, id: "", padding: rest.paddingPx ?? 0, margin: rest.marginPx ?? 0, ...common, rawLineNo: lineNo },
+      };
     }
 
     if (tag === "C") {
       const caption = get(1);
       if (!String(caption).trim()) throw formatError("C", "CAPTION обязателен.");
-      const rest = parseUnorderedFields(fields.slice(2), { allowSize: true, allowAlign: true, allowAction: true, allowHint: true });
+      const rest = parseUnorderedFields(fields.slice(2), {
+        allowSize: true,
+        allowAlign: true,
+        allowAction: true,
+        allowHint: true,
+        allowMargin: true,
+        allowPadding: true,
+      });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const actionStr = rest.actionStr;
       const hint = rest.hint;
       const common = parseCommon({ caption, sizeStr, alignStr, actionStr, hint });
       // C ACTION is not meaningful; strict/permissive behavior is enforced in parseAction.
-      return { indent, node: { tag, id: "", ...common, rawLineNo: lineNo } };
+      return {
+        indent,
+        node: { tag, id: "", padding: rest.paddingPx ?? 0, margin: rest.marginPx ?? 0, ...common, rawLineNo: lineNo },
+      };
     }
 
     if (tag === "F") {
-      const rest = parseUnorderedFields(fields.slice(1), { allowSize: true, allowAlign: true, allowAction: false, allowHint: true });
+      const rest = parseUnorderedFields(fields.slice(1), {
+        allowSize: true,
+        allowAlign: true,
+        allowAction: false,
+        allowHint: true,
+        allowMargin: false,
+        allowPadding: true,
+      });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const hint = rest.hint;
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
-      return { indent, node: { tag, id: "", ...common, rawLineNo: lineNo } };
+      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, ...common, rawLineNo: lineNo } };
     }
 
     if (tag === "T") {
-      const rest = parseUnorderedFields(fields.slice(1), { allowSize: true, allowAlign: true, allowAction: true, allowHint: true, allowCols: true });
+      const rest = parseUnorderedFields(fields.slice(1), {
+        allowSize: true,
+        allowAlign: true,
+        allowAction: true,
+        allowHint: true,
+        allowCols: true,
+        allowMargin: true,
+        allowPadding: true,
+      });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const hint = rest.hint;
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: rest.actionStr, hint });
-      return { indent, node: { tag, id: "", colsSpec: rest.colsSpec || "", ...common, rawLineNo: lineNo } };
+    return {
+      indent,
+      node: {
+        tag,
+          id: "",
+          colsSpec: rest.colsSpec || "",
+          margin: rest.marginPx ?? 0,
+          cellPadding: rest.paddingPx ?? 0,
+          ...common,
+        rawLineNo: lineNo,
+      },
+    };
     }
 
     throw new UxlParseError(
@@ -667,25 +761,25 @@
       // Validate ID charset for nodes that have ID provided
       if (node.tag === "P") {
         if (node.id) {
-          if (!/^[A-Za-z0-9_-]+$/.test(node.id)) {
+        if (!/^[A-Za-z0-9_-]+$/.test(node.id)) {
           throw new UxlParseError("Некорректный ID у P (разрешены латиница/цифры/_/-).", {
             line: node.rawLineNo,
             col: 1,
             sourceName,
             lineText: lines[node.rawLineNo - 1],
           });
-          }
-          const key = normalizeId(node.id);
+        }
+        const key = normalizeId(node.id);
           if (pageIds.has(key)) {
             throw new UxlParseError(`Дублирующийся ID страницы "${node.id}" (case-insensitive).`, {
-              line: node.rawLineNo,
-              col: 1,
-              sourceName,
-              lineText: lines[node.rawLineNo - 1],
-            });
-          }
+            line: node.rawLineNo,
+            col: 1,
+            sourceName,
+            lineText: lines[node.rawLineNo - 1],
+          });
+        }
           pageIds.add(key);
-          pagesById.set(key, node);
+        pagesById.set(key, node);
         }
         pages.push(node);
       }
@@ -986,6 +1080,7 @@
         // F is invisible visually, but it must exist as a DOM container to support crop/scroll.
         nodeEl = el("div", { class: "uxl-node uxl-F", "data-uxl-uid": node.uid });
         if (node.hint) nodeEl.title = node.hint;
+        if (Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
         domByUid.set(node.uid, nodeEl);
         parentEl.append(nodeEl);
         for (const ch of node.children || []) renderNode(ch, nodeEl);
@@ -997,6 +1092,7 @@
         nodeEl = el("button", { class: "uxl-node uxl-B", type: "button", "data-uxl-uid": node.uid, text: node.caption || "" });
       } else if (tag === "T") {
         nodeEl = el("div", { class: "uxl-node uxl-T", "data-uxl-uid": node.uid });
+        nodeEl.style.setProperty("--uxl-table-cell-pad", `${Number.isFinite(node.cellPadding) ? node.cellPadding : 0}px`);
         const table = el("table");
         const colgroup = el("colgroup");
         for (const col of node._tcCols || []) {
@@ -1033,6 +1129,7 @@
       }
 
       if (node.hint) nodeEl.title = node.hint;
+      if ((tag === "C" || tag === "B") && Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
       domByUid.set(node.uid, nodeEl);
       parentEl.append(nodeEl);
 
@@ -1079,10 +1176,12 @@
     }
 
     function layoutContainer(node, containerDomEl, parentW, parentH, { root = false } = {}) {
+      const pad = (node.tag === "P" || node.tag === "F") && Number.isFinite(node.padding) ? node.padding : 0;
       // Determine current container base size (as minimum) from its SIZE, otherwise from provided (root) or from children.
       const base = root ? { w: parentW, h: parentH } : resolveBaseSize(node, parentW, parentH);
       let cw = base.w ?? 0;
       let ch = base.h ?? 0;
+      if (containerDomEl) containerDomEl.style.padding = `${pad}px`;
 
       // Prepare overflow styles (crop/scroll) for this container element.
       if (root) {
@@ -1117,7 +1216,11 @@
         else mid.push(chNode);
       }
 
-      // First, compute children sizes (recursively) with current container size as reference (for %).
+      // Inner content box size (percent sizes are based on it; children are positioned relative to padding edge).
+      const innerW = Math.max(0, cw - pad * 2);
+      const innerH = Math.max(0, ch - pad * 2);
+
+      // First, compute children sizes (recursively) with current container inner size as reference (for %).
       const childSize = new Map(); // uid -> {w,h}
       function computeChildSize(chNode, curW, curH) {
         const tag = chNode.tag;
@@ -1162,12 +1265,13 @@
             : Math.max(baseSz.h ?? 0, intrinsic.h)
           : intrinsic.h;
 
-        return { w: wFinal, h: hFinal };
+        const m = Number.isFinite(chNode.margin) ? chNode.margin : 0;
+        return { w: wFinal + m * 2, h: hFinal + m * 2, innerW: wFinal, innerH: hFinal, m };
       }
 
       // Iteration is handled by the outer loop; here we use cw/ch as the current container size.
       for (const chNode of kids) {
-        childSize.set(chNode.uid, computeChildSize(chNode, cw || parentW || 0, ch || parentH || 0));
+        childSize.set(chNode.uid, computeChildSize(chNode, innerW || parentW || 0, innerH || parentH || 0));
       }
 
       // Compute required width/height for the container based on stacking rules (no overlaps).
@@ -1200,10 +1304,26 @@
       // Root (P) scrolls by default, so its size does not auto-grow.
       const contOw = node.size?.w?.overflow || (root ? windowSize.overflowW || "scroll" : null) || null;
       const contOh = node.size?.h?.overflow || (root ? windowSize.overflowH || "scroll" : null) || null;
-      if (!contOw) cw = Math.max(cw, neededW);
-      if (!contOh) ch = Math.max(ch, neededH);
+      if (!contOw) cw = Math.max(cw, neededW + pad * 2);
+      if (!contOh) ch = Math.max(ch, neededH + pad * 2);
 
       // Now place children.
+      const placeW = Math.max(0, cw - pad * 2);
+      const placeH = Math.max(0, ch - pad * 2);
+
+      function applyBoxStyles(uid, x, y) {
+        const eln = domByUid.get(uid);
+        const sz = childSize.get(uid) || { w: 0, h: 0, innerW: 0, innerH: 0, m: 0 };
+        if (!eln) return;
+        const m = sz.m || 0;
+        const iw = sz.innerW != null ? sz.innerW : Math.max(0, sz.w - m * 2);
+        const ih = sz.innerH != null ? sz.innerH : Math.max(0, sz.h - m * 2);
+        eln.style.left = `${x + m}px`;
+        eln.style.top = `${y + m}px`;
+        eln.style.width = `${iw}px`;
+        eln.style.height = `${ih}px`;
+      }
+
       function rectsOverlap(a, b) {
         return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
       }
@@ -1216,7 +1336,7 @@
         for (const n of nodes) {
           const sz = childSize.get(n.uid) || { w: 0, h: 0 };
           const hA = n.align?.h || null;
-          const pref = alignToXY({ hAlign: hA, vAlign, parentW: cw, parentH: ch, w: sz.w, h: sz.h });
+          const pref = alignToXY({ hAlign: hA, vAlign, parentW: placeW, parentH: placeH, w: sz.w, h: sz.h });
           let x = pref.x;
           let y = pref.y;
 
@@ -1238,13 +1358,7 @@
             }
           }
 
-          const eln = domByUid.get(n.uid);
-          if (eln) {
-            eln.style.left = `${x}px`;
-            eln.style.top = `${y}px`;
-            eln.style.width = `${sz.w}px`;
-            eln.style.height = `${sz.h}px`;
-          }
+          applyBoxStyles(n.uid, x, y);
           placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
         }
         return placed;
@@ -1256,7 +1370,7 @@
 
       // 2) Bottom band: prefer bottom; on overlap push up
       const placedBottom = placeBand(bottom, { vAlign: "B", pushDown: false });
-      const bottomStart = placedBottom.length ? placedBottom.reduce((m, r) => Math.min(m, r.y), ch) : ch;
+      const bottomStart = placedBottom.length ? placedBottom.reduce((m, r) => Math.min(m, r.y), placeH) : placeH;
 
       // 3) Middle band: horizontal packing between top and bottom, centered vertically in the remaining space.
       const midAreaY = topExtent;
@@ -1267,37 +1381,25 @@
       const rightW = sumW(midR);
       const centerW = sumW(midC);
       const contentW = leftW + centerW + rightW;
-      if (!contOw) cw = Math.max(cw, contentW);
+      // cw already accounts for neededW (which includes contentW) above.
 
       // L group: left to right
       let xL = 0;
       for (const n of midL) {
         const sz = childSize.get(n.uid) || { w: 0, h: 0 };
         const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
-        const eln = domByUid.get(n.uid);
-        if (eln) {
-          eln.style.left = `${xL}px`;
-          eln.style.top = `${y}px`;
-          eln.style.width = `${sz.w}px`;
-          eln.style.height = `${sz.h}px`;
-        }
+        applyBoxStyles(n.uid, xL, y);
         xL += sz.w;
       }
 
       // R group: right to left
-      let xR = cw;
+      let xR = placeW;
       for (let i = midR.length - 1; i >= 0; i--) {
         const n = midR[i];
         const sz = childSize.get(n.uid) || { w: 0, h: 0 };
         xR -= sz.w;
         const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
-        const eln = domByUid.get(n.uid);
-        if (eln) {
-          eln.style.left = `${xR}px`;
-          eln.style.top = `${y}px`;
-          eln.style.width = `${sz.w}px`;
-          eln.style.height = `${sz.h}px`;
-        }
+        applyBoxStyles(n.uid, xR, y);
       }
 
       // Center group: packed left-to-right, but centered between L and R if possible.
@@ -1309,13 +1411,7 @@
       for (const n of midC) {
         const sz = childSize.get(n.uid) || { w: 0, h: 0 };
         const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
-        const eln = domByUid.get(n.uid);
-        if (eln) {
-          eln.style.left = `${xC}px`;
-          eln.style.top = `${y}px`;
-          eln.style.width = `${sz.w}px`;
-          eln.style.height = `${sz.h}px`;
-        }
+        applyBoxStyles(n.uid, xC, y);
         xC += sz.w;
       }
 
