@@ -319,8 +319,8 @@
           return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
         case "I":
           return {
-            format: "I\\SRC:<url>\\[SIZE/ALIGN/FIT|CROP/M10/HINT...] (поля в любом порядке; без PADDING)",
-            example: "I\\SRC:src/yarmap.PNG\\200x\\LT\\M6\\FIT\\Подсказка картинки",
+            format: "I\\SRC:<url>\\[SIZE/ALIGN/FIT|CROP/M10/R6/HINT...] (поля в любом порядке; без PADDING)",
+            example: "I\\SRC:src/yarmap.PNG\\200x\\LT\\M6\\R12\\FIT\\Подсказка картинки",
           };
         case "B":
           return {
@@ -833,7 +833,7 @@
         allowCols: false,
         allowMargin: true,
         allowPadding: false,
-        allowRadius: false,
+        allowRadius: true,
         allowIcon: false,
         allowSrc: true,
         allowFit: true,
@@ -853,6 +853,7 @@
           src,
           fit: rest.fitMode || "none",
           margin: rest.marginPx ?? 0,
+          radius: rest.radiusPx ?? 0,
           ...common,
         rawLineNo: lineNo,
       },
@@ -1585,6 +1586,7 @@
         nodeEl = el("div", { class: "uxl-node uxl-I", "data-uxl-uid": node.uid });
         const fit = String(node.fit || "").trim().toLowerCase();
         if (fit === "contain" || fit === "cover") nodeEl.style.setProperty("--uxl-img-fit", fit);
+        if (Number.isFinite(node.radius) && node.radius > 0) nodeEl.style.borderRadius = `${node.radius}px`;
         const img = document.createElement("img");
         img.className = "uxl-I__img";
         img.alt = "";
