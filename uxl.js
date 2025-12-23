@@ -281,6 +281,7 @@
   function parseAction(actionStr, meta, mode) {
     const s = (actionStr || "").trim();
     if (!s) return null;
+    if (/^GOTOBACK$/i.test(s)) return { type: "GOTOBACK" };
     const m = /^GOTO:(.+)$/.exec(s);
     if (m) return { type: "GOTO", target: m[1].trim() };
     const old = /^GOTO:P(.+)$/.exec(s);
@@ -472,7 +473,7 @@
 
     function isActionToken(s) {
       const v = String(s || "").trim().toUpperCase();
-      return v.startsWith("GOTO:") || v.startsWith("GOTO:P");
+      return v === "GOTOBACK" || v.startsWith("GOTO:") || v.startsWith("GOTO:P");
     }
 
     function isColsToken(s) {
@@ -3429,17 +3430,50 @@
       return true;
     }
 
-    // Wire button clicks (GOTO) to navigate between pages (scroll the browser page).
-    function wireGotoClicks() {
+    // Wire ACTION clicks to navigate between pages (scroll the browser page).
+    function wireActionClicks() {
+      const navRoot = page.closest(".uxl-root") || document;
+      if (!navRoot.__uxlNavState) navRoot.__uxlNavState = { stack: [] };
+      const nav = navRoot.__uxlNavState;
+
+      const nearestPageUidFromNode = (n) => {
+        let cur = n;
+        while (cur && cur.tag !== "P") cur = cur.parent;
+        return cur ? cur.uid : null;
+      };
+
+      const ensureTopIs = (uid) => {
+        if (!uid) return;
+        const last = nav.stack[nav.stack.length - 1] || null;
+        if (!last) {
+          nav.stack.push(uid);
+          return;
+        }
+        if (last !== uid) nav.stack.push(uid);
+      };
+
       const clickable = Array.from(canvas.querySelectorAll('[data-uxl-uid]'));
       for (const elx of clickable) {
         const uid = elx.getAttribute("data-uxl-uid");
         if (!uid) continue;
         const node = ast.nodeByUid?.get(uid) || null;
-        if (!node || !node.action || node.action.type !== "GOTO") continue;
+        if (!node || !node.action || (node.action.type !== "GOTO" && node.action.type !== "GOTOBACK")) continue;
         elx.style.cursor = "pointer";
         elx.addEventListener("click", (ev) => {
           ev.preventDefault();
+
+          // Maintain a simple navigation stack per rendered root.
+          const fromUid = nearestPageUidFromNode(node);
+          ensureTopIs(fromUid);
+
+          if (node.action.type === "GOTOBACK") {
+            if (nav.stack.length <= 1) return;
+            nav.stack.pop(); // drop current
+            const backUid = nav.stack[nav.stack.length - 1] || null;
+            if (backUid) scrollToPageUid(backUid);
+            return;
+          }
+
           const targetId = String(node.action.target || "").trim();
           const targetKey = normalizeId(targetId);
           const pageUid = ast.pageIdToUid?.[targetKey] || null;
@@ -3448,12 +3482,13 @@
             alert(`UXL: страница для GOTO не найдена: "${targetId}"`);
             return;
           }
+          ensureTopIs(pageUid);
           if (!scrollToPageUid(pageUid)) alert(`UXL: не удалось перейти к странице "${targetId}" (DOM не найден).`);
         });
       }
     }
     // Defer wiring until DOM is in place (after renderAll replacement).
-    queueMicrotask(() => wireGotoClicks());
+    queueMicrotask(() => wireActionClicks());
 
     // Collect hints (only nodes with non-empty hint)
     const hintItems = [];
@@ -3745,9 +3780,21 @@
 
     const pageByUid = new Map(ast.pages.map((p) => [p.uid, p]));
     let currentUid = ast.pages[0]?.uid || null;
+    const navStack = currentUid ? [currentUid] : [];
     let lastWinW = win.w;
     let lastWinH = win.h;
     let gotoAfterTimerId = null;
+
+    function navigateTo(uid, { pushHistory = true } = {}) {
+      if (!uid) return;
+      if (pushHistory) {
+        const last = navStack[navStack.length - 1] || null;
+        if (!last) navStack.push(uid);
+        else if (last !== uid) navStack.push(uid);
+      }
+      currentUid = uid;
+      renderCurrent();
+    }
 
     function refreshFullscreenWindowIfNeeded() {
       if (view !== "fullscreen") return;
@@ -3781,22 +3828,30 @@
         if (next) {
           gotoAfterTimerId = window.setTimeout(() => {
             gotoAfterTimerId = null;
-            currentUid = next.uid;
-            renderCurrent();
+            navigateTo(next.uid, { pushHistory: true });
           }, Math.round(sec * 1000));
         }
       }
 
-      // wire goto: switch pages inside prototype
+      // wire actions: switch pages inside prototype
       const clickable = Array.from(canvas.querySelectorAll('[data-uxl-uid]'));
       for (const elx of clickable) {
         const uid = elx.getAttribute("data-uxl-uid");
         if (!uid) continue;
         const node = ast.nodeByUid?.get(uid) || null;
-        if (!node || !node.action || node.action.type !== "GOTO") continue;
+        if (!node || !node.action || (node.action.type !== "GOTO" && node.action.type !== "GOTOBACK")) continue;
         elx.style.cursor = "pointer";
         elx.addEventListener("click", (ev) => {
           ev.preventDefault();
+
+          if (node.action.type === "GOTOBACK") {
+            if (navStack.length <= 1) return;
+            navStack.pop(); // drop current
+            const backUid = navStack[navStack.length - 1] || null;
+            navigateTo(backUid, { pushHistory: false });
+            return;
+          }
+
           const targetId = String(node.action.target || "").trim();
           const targetKey = normalizeId(targetId);
           const targetUid = ast.pageIdToUid?.[targetKey] || null;
@@ -3804,12 +3859,11 @@
             alert(`UXL: страница для GOTO не найдена: "${targetId}"`);
             return;
           }
-          currentUid = targetUid;
-          renderCurrent();
+          navigateTo(targetUid, { pushHistory: true });
         });
       }
 
-      // No explicit back button in prototype; use browser back if needed.
+      // GOTOBACK is supported via ACTION (uses navStack).
     }
 
     function applyScaleToFit() {

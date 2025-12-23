@@ -2,7 +2,7 @@
   "name": "uxl-syntax",
   "displayName": "UXL Syntax Highlighting",
   "description": "Syntax highlighting for User Experience Language (UXL) in Markdown and HTML.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "uxl-local",
   "private": true,
   "engines": {

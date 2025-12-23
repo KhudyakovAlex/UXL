@@ -199,6 +199,7 @@
     "gotoTok": {
       "patterns": [
         { "name": "keyword.control.goto.uxl", "match": "\\bGOTO:[^\\\\\\s]+" },
+        { "name": "keyword.control.goto.uxl", "match": "\\bGOTOBACK\\b" },
         { "name": "keyword.control.goto.uxl", "match": "\\bGOTOAFTER:[0-9]+(?:\\.[0-9]+)?\\b" }
       ]
     },

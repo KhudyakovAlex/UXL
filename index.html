@@ -40,7 +40,7 @@ P\controllers\Контроллеры\Список контроллеров, ко
   
   # Панель ИИ
   F\OUT:B\100%x48\#333333
-    I\ICON:ai:36\48x48\OUT:M10\#FFFFFF\Кнопка вызова ИИ-джина
+    I\ICON:ai:36\48x48\OUT:M10\#FFFFFF\GOTO:llm\Кнопка вызова ИИ-джина
     S\1\\\80x28\OUT:L:M10\Включение ИИ
     S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
 
@@ -93,14 +93,29 @@ P\settings\Настройки\Настройки приложения
 
   # Панель ИИ
   F\OUT:B\100%x48\#333333
-    I\ICON:ai:36\48x48\OUT:M10\#FFFFFF\Кнопка вызова ИИ-джина
+    I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\Кнопка вызова ИИ-джина
     S\1\\\80x28\OUT:L:M10\Включение ИИ
     S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
 
 P\controller\Контроллер\Страница конкретного контроллера
   F\OUT:LT
-    I\ICON:back:36\48x48\OUT:L:M10\#111111\GOTO:controllers\Назад к списку
+    I\ICON:back:36\48x48\OUT:L:M10\#111111\GOTOBACK\Назад к списку
     C\Этаж2\FONT:24\x48\OUT:L\#333333
+
+  # Панель ИИ
+  F\OUT:B\100%x48\#333333
+    I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\Кнопка вызова ИИ-джина
+    S\1\\\80x28\OUT:L:M10\Включение ИИ
+    S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
+
+P\llm\Чат с LLM\Страница общения с ИИ-джином
+  F\OUT:LT
+    I\ICON:back:36\48x48\OUT:L:M10\#111111\GOTOBACK\Назад отсюда
+
+  # Основной контент
+  F\OUT:TL\IN:V
+    F\
+      C\Чат с ИИ-джином\FONT:24\x48\OUT:L\#333333
 
   # Панель ИИ
   F\OUT:B\100%x48\#333333
