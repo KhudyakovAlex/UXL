@@ -321,17 +321,17 @@
           return {
             format:
               'I\\SRC:<url>|<iconName>\\[SIZE/ALIGN/FIT|CROP/ICON:NAME[:SIZE]/M10/R6/HINT...] (поля в любом порядке; без PADDING). Если SRC — это имя встроенной иконки, рисуется SVG-иконка.',
-            example: "I\\home\\24x24\\LT\\Подсказка иконки",
+            example: "I\\home\\24x24\\IN:LT\\Подсказка иконки",
           };
         case "B":
           return {
             format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\ICON:search:18\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
+            example: "B\\ICON:search:18\\100x\\IN:RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return {
             format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
-            example: "C\\Текст\\x20\\LT\\P6\\M4\\FONT:24:BI\\Подсказка",
+            example: "C\\Текст\\x20\\IN:LT\\P6\\M4\\FONT:24:BI\\Подсказка",
           };
         case "T":
           return {
@@ -356,7 +356,7 @@
 
     function parseCommon({ caption = "", sizeStr = "", alignStr = "", actionStr = "", hint = "" } = {}) {
       const size = sizeStr ? parseSize(sizeStr, meta) : null;
-      const align = alignStr ? parseAlign(alignStr, meta) : null;
+      const align = alignStr ? parseAlign(alignStr, meta) : { h: null, v: null };
       const action = actionStr ? parseAction(actionStr, meta, mode) : null;
       return { caption: caption || "", size, align, action, hint: hint || "" };
     }
@@ -379,6 +379,15 @@
       if (v.includes("L") && v.includes("R")) return false;
       if (v.includes("T") && v.includes("B")) return false;
       return true;
+    }
+
+    function parseInAlignToken(s) {
+      const v = String(s || "").trim();
+      const m = /^IN:([LRTB]+)$/i.exec(v);
+      if (!m) return null;
+      const a = String(m[1] || "").trim().toUpperCase();
+      if (!isAlignToken(a)) return null;
+      return a;
     }
 
     function isActionToken(s) {
@@ -758,6 +767,11 @@
           setOnce("size", v);
           continue;
         }
+        const inA = parseInAlignToken(v);
+        if (allowAlign && inA) {
+          setOnce("align", inA);
+          continue;
+        }
         if (allowAlign && isAlignToken(v)) {
           setOnce("align", v);
           continue;
@@ -955,6 +969,7 @@
         !isIconToken(first) &&
         !isSizeToken(first) &&
         !isAlignToken(first) &&
+        !parseInAlignToken(first) &&
         !isMarginToken(first) &&
         !isPaddingToken(first) &&
         !isRadiusToken(first) &&

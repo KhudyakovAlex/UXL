@@ -30,15 +30,15 @@
 ```UXL
 400x700
 P\home\Главная страница\P16\Хинт страницы (показывается без линии отводки)
-  F\100%x100%\LT\P12\Хинт контейнера
-    C\Заголовок\x40\LT\P6\M4\Хинт надписи
-    B\Перейти на users\ICON:chevron-right\RB\140x32\P8\M6\GOTO:users\Хинт кнопки (переход)
-    T\COLS:20R,50L,30\100%x60%\B\M10\P6\Хинт таблицы
+  F\100%x100%\IN:LT\P12\Хинт контейнера
+    C\Заголовок\x40\IN:LT\P6\M4\Хинт надписи
+    B\Перейти на users\ICON:chevron-right\IN:RB\140x32\P8\M6\GOTO:users\Хинт кнопки (переход)
+    T\COLS:20R,50L,30\100%x60%\IN:B\M10\P6\Хинт таблицы
       TH\ID\ФИО\Роль
       TD\1\Алексей\Админ
 P\users\Пользователи\Хинт второй страницы
-  C\Вы на странице users\x20\T\P6\M4\Хинт надписи на второй странице
-  B\Назад на home\ICON:back\L\120x32\P8\M6\GOTO:home\Хинт кнопки назад
+  C\Вы на странице users\x20\IN:T\P6\M4\Хинт надписи на второй странице
+  B\Назад на home\ICON:back\IN:L\120x32\P8\M6\GOTO:home\Хинт кнопки назад
 ```
 ````
 
@@ -120,13 +120,14 @@ P\users\Пользователи\Хинт второй страницы
 
 ## ALIGN — выравнивание элемента
 
-ALIGN задаёт выравнивание по горизонтали и вертикали относительно контейнера-родителя.
+Выравнивание задаётся токеном вида `IN:<ALIGN>` (например `IN:LT`).
+`IN:<ALIGN>` задаёт выравнивание по горизонтали и вертикали относительно контейнера-родителя.
 
 - Горизонталь: `L` (влево) или `R` (вправо), если не указано — по центру.
 - Вертикаль: `T` (вверх) или `B` (вниз), если не указано — по центру.
 - **`LR` запрещено**, **`TB` запрещено**.
 
-Допустимые комбинации: `LT`, `LB`, `RT`, `RB`, `L`, `R`, `T`, `B`, пусто (центр).
+Допустимые комбинации: `IN:LT`, `IN:LB`, `IN:RT`, `IN:RB`, `IN:L`, `IN:R`, `IN:T`, `IN:B`. Пусто — центр.
 
 ## ACTION
 
@@ -305,27 +306,27 @@ ALIGN задаёт выравнивание по горизонтали и ве�
 ```UXL
 300x220
 P\icons\ICON names
-  F\100%x100%\LT\P10
-    B\ai\ICON:ai\120x28\LT
-    B\arrow-left\ICON:arrow-left\120x28\LT
-    B\arrow-right\ICON:arrow-right\120x28\LT
-    B\back\ICON:back\120x28\LT
-    B\box\ICON:box\120x28\LT
-    B\chevron-left\ICON:chevron-left\120x28\LT
-    B\chevron-right\ICON:chevron-right\120x28\LT
-    B\close\ICON:close\120x28\LT
-    B\codepen\ICON:codepen\120x28\LT
-    B\cpu\ICON:cpu\120x28\LT
-    B\edit\ICON:edit\120x28\LT
-    B\grid\ICON:grid\120x28\LT
-    B\home\ICON:home\120x28\LT
-    B\microphone\ICON:microphone\120x28\LT
-    B\plus\ICON:plus\120x28\LT
-    B\search\ICON:search\120x28\LT
-    B\sun\ICON:sun\120x28\LT
-    B\settings\ICON:settings\120x28\LT
-    B\trash\ICON:trash\120x28\LT
-    B\volume-2\ICON:volume-2\120x28\LT
+  F\100%x100%\IN:LT\P10
+    B\ai\ICON:ai\120x28\IN:LT
+    B\arrow-left\ICON:arrow-left\120x28\IN:LT
+    B\arrow-right\ICON:arrow-right\120x28\IN:LT
+    B\back\ICON:back\120x28\IN:LT
+    B\box\ICON:box\120x28\IN:LT
+    B\chevron-left\ICON:chevron-left\120x28\IN:LT
+    B\chevron-right\ICON:chevron-right\120x28\IN:LT
+    B\close\ICON:close\120x28\IN:LT
+    B\codepen\ICON:codepen\120x28\IN:LT
+    B\cpu\ICON:cpu\120x28\IN:LT
+    B\edit\ICON:edit\120x28\IN:LT
+    B\grid\ICON:grid\120x28\IN:LT
+    B\home\ICON:home\120x28\IN:LT
+    B\microphone\ICON:microphone\120x28\IN:LT
+    B\plus\ICON:plus\120x28\IN:LT
+    B\search\ICON:search\120x28\IN:LT
+    B\sun\ICON:sun\120x28\IN:LT
+    B\settings\ICON:settings\120x28\IN:LT
+    B\trash\ICON:trash\120x28\IN:LT
+    B\volume-2\ICON:volume-2\120x28\IN:LT
 ```
 ````
 
