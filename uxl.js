@@ -259,13 +259,18 @@
   function parseAlign(alignStr, meta) {
     const s = (alignStr || "").trim().toUpperCase();
     if (!s) return { h: null, v: null };
-    if (!/^[LRTB]+$/.test(s)) throw new UxlParseError("ALIGN может содержать только символы L, R, T, B.", meta);
+    if (!/^[LRTBCM]+$/.test(s)) throw new UxlParseError("ALIGN может содержать только символы L, R, T, B, C, M.", meta);
     const hasL = s.includes("L");
     const hasR = s.includes("R");
+    const hasC = s.includes("C");
     const hasT = s.includes("T");
     const hasB = s.includes("B");
-    if (hasL && hasR) throw new UxlParseError("ALIGN: комбинация LR запрещена.", meta);
-    if (hasT && hasB) throw new UxlParseError("ALIGN: комбинация TB запрещена.", meta);
+    const hasM = s.includes("M");
+    const hCount = Number(hasL) + Number(hasR) + Number(hasC);
+    const vCount = Number(hasT) + Number(hasB) + Number(hasM);
+    if (hCount > 1) throw new UxlParseError("ALIGN: по горизонтали можно указать только одно из L/R/C.", meta);
+    if (vCount > 1) throw new UxlParseError("ALIGN: по вертикали можно указать только одно из T/B/M.", meta);
+    // C/M mean "center"/"middle" which maps to null (default center) on that axis.
     return { h: hasL ? "L" : hasR ? "R" : null, v: hasT ? "T" : hasB ? "B" : null };
   }
 
@@ -374,10 +379,15 @@
     function isAlignToken(s) {
       const v = String(s || "").trim().toUpperCase();
       if (!v) return false;
-      if (!/^[LRTB]+$/.test(v)) return false;
-      // LR and TB are forbidden
-      if (v.includes("L") && v.includes("R")) return false;
-      if (v.includes("T") && v.includes("B")) return false;
+      if (!/^[LRTBCM]+$/.test(v)) return false;
+      const hasL = v.includes("L");
+      const hasR = v.includes("R");
+      const hasC = v.includes("C");
+      const hasT = v.includes("T");
+      const hasB = v.includes("B");
+      const hasM = v.includes("M");
+      if (Number(hasL) + Number(hasR) + Number(hasC) > 1) return false;
+      if (Number(hasT) + Number(hasB) + Number(hasM) > 1) return false;
       return true;
     }
 
@@ -413,7 +423,7 @@
 
     function parseInToken(raw) {
       const v = String(raw || "").trim();
-      const m = /^IN:([LRTB]+)$/i.exec(v);
+      const m = /^IN:([LRTBCM]+)$/i.exec(v);
       if (!m) return null;
       const a = String(m[1] || "").trim().toUpperCase();
       if (!isAlignToken(a)) return null;
