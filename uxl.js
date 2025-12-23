@@ -411,6 +411,15 @@
       return { align, marginPx };
     }
 
+    function parseInToken(raw) {
+      const v = String(raw || "").trim();
+      const m = /^IN:([LRTB]+)$/i.exec(v);
+      if (!m) return null;
+      const a = String(m[1] || "").trim().toUpperCase();
+      if (!isAlignToken(a)) return null;
+      return { align: a };
+    }
+
     function isActionToken(s) {
       const v = String(s || "").trim().toUpperCase();
       return v.startsWith("GOTO:") || v.startsWith("GOTO:P");
@@ -543,6 +552,7 @@
       {
         allowSize = true,
         allowAlign = true,
+        allowInAlign = false,
         allowAction = true,
         allowHint = true,
         allowCols = false,
@@ -560,6 +570,7 @@
     ) {
       let sizeStr = "";
       let alignStr = "";
+      let inAlignStr = "";
       let actionStr = "";
       let hint = "";
       let colsSpec = "";
@@ -584,6 +595,11 @@
         if (kind === "align") {
           if (alignStr) throw formatError(tag, "ALIGN указан более одного раза.");
           alignStr = val;
+          return;
+        }
+        if (kind === "inAlign") {
+          if (inAlignStr) throw formatError(tag, "IN:ALIGN указан более одного раза.");
+          inAlignStr = val;
           return;
         }
         if (kind === "action") {
@@ -784,8 +800,14 @@
           setOnce("size", v);
           continue;
         }
+        const inTok = parseInToken(v);
+        if (inTok) {
+          if (!allowInAlign) throw formatError(tag, `Поле "${v}" (IN) не поддерживается для этого тега.`);
+          setOnce("inAlign", inTok.align);
+          continue;
+        }
         if (/^IN:/i.test(v)) {
-          throw formatError(tag, `Поле "${v}" запрещено. Используйте OUT:<ALIGN> (например OUT:LT).`);
+          throw formatError(tag, `Поле "${v}" не распознано. Ожидается IN:<ALIGN> (например IN:LT).`);
         }
         const out = parseOutToken(v);
         if (out) {
@@ -812,6 +834,7 @@
       return {
         sizeStr,
         alignStr,
+        inAlignStr,
         actionStr,
         hint,
         colsSpec,
@@ -853,6 +876,7 @@
       const rest = parseUnorderedFields(restTokens, {
         allowSize: false,
         allowAlign: false,
+        allowInAlign: true,
         allowAction: false,
         allowHint: true,
         allowCols: false,
@@ -863,7 +887,8 @@
       const hint = rest.hint || "";
       const padding = rest.paddingPx ?? 0;
       const gotoAfterSec = rest.gotoAfterSec;
-      return { indent, node: { tag, id, caption, padding, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
+      const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
+      return { indent, node: { tag, id, caption, padding, inAlign, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -965,6 +990,7 @@
       const rest = parseUnorderedFields(fields.slice(1), {
         allowSize: true,
         allowAlign: true,
+        allowInAlign: true,
         allowAction: false,
         allowHint: true,
         allowMargin: false,
@@ -980,7 +1006,8 @@
       const bg = rest.bgUrl || "";
       const bgColor = rest.colorHex || "";
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
-      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, bg, bgColor, ...common, rawLineNo: lineNo } };
+      const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
+      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, inAlign, bg, bgColor, ...common, rawLineNo: lineNo } };
     }
 
     if (tag === "I") {
@@ -2030,8 +2057,18 @@
       const top = [];
       const mid = [];
       const bottom = [];
+      const inAlign = node.inAlign || null; // default align for children inside this container
+      const effAlign = (ch) => {
+        const base = ch?.align || { h: null, v: null };
+        if (!inAlign) return base;
+        // If child doesn't specify alignment (center on both axes), use container IN as default.
+        const h = base.h == null && base.v == null ? inAlign.h : base.h;
+        const v = base.h == null && base.v == null ? inAlign.v : base.v;
+        // Merge per-axis: if axis is still null, inherit from container.
+        return { h: h ?? inAlign.h, v: v ?? inAlign.v };
+      };
       for (const chNode of kids) {
-        const v = chNode.align?.v || null;
+        const v = effAlign(chNode).v || null;
         if (v === "T") top.push(chNode);
         else if (v === "B") bottom.push(chNode);
         else mid.push(chNode);
@@ -2234,7 +2271,7 @@
       const midC = [];
       const midR = [];
       for (const n of mid) {
-        const hA = n.align?.h || null;
+        const hA = effAlign(n).h || null;
         if (hA === "L") midL.push(n);
         else if (hA === "R") midR.push(n);
         else midC.push(n);
@@ -2301,7 +2338,7 @@
         const placed = []; // {uid,x,y,w,h}
         for (const n of nodes) {
           const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-          const hA = n.align?.h || null;
+          const hA = effAlign(n).h || null;
           const pref = alignToXY({ hAlign: hA, vAlign, parentW: placeW, parentH: placeH, w: sz.w, h: sz.h });
           let x = pref.x;
           let y = pref.y;
