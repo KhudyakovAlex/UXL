@@ -2,7 +2,7 @@
   "name": "uxl-syntax",
   "displayName": "UXL Syntax Highlighting",
   "description": "Syntax highlighting for User Experience Language (UXL) in Markdown and HTML.",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "publisher": "uxl-local",
   "private": true,
   "engines": {
@@ -10,6 +10,56 @@
   },
   "categories": ["Programming Languages"],
   "contributes": {
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": [
+              "meta.line.p.uxl",
+              "meta.line.p.uxl keyword.control.tag.uxl",
+              "meta.line.p.uxl punctuation.separator.field.uxl",
+              "meta.line.p.uxl string.quoted.double.uxl",
+              "meta.line.p.uxl keyword.other.out.uxl",
+              "meta.line.p.uxl keyword.other.in.uxl",
+              "meta.line.p.uxl constant.other.size.uxl",
+              "meta.line.p.uxl constant.other.color.uxl",
+              "meta.line.p.uxl support.function.icon.uxl",
+              "meta.line.p.uxl string.other.link.uxl",
+              "meta.line.p.uxl variable.other.cols.uxl",
+              "meta.line.p.uxl support.type.font.uxl",
+              "meta.line.p.uxl keyword.control.goto.uxl",
+              "meta.line.p.uxl constant.numeric.uxl",
+              "meta.line.p.uxl constant.character.escape.uxl"
+            ],
+            "settings": {
+              "foreground": "#ff4d4d"
+            }
+          },
+          {
+            "scope": [
+              "meta.line.f.uxl",
+              "meta.line.f.uxl keyword.control.tag.uxl",
+              "meta.line.f.uxl punctuation.separator.field.uxl",
+              "meta.line.f.uxl string.quoted.double.uxl",
+              "meta.line.f.uxl keyword.other.out.uxl",
+              "meta.line.f.uxl keyword.other.in.uxl",
+              "meta.line.f.uxl constant.other.size.uxl",
+              "meta.line.f.uxl constant.other.color.uxl",
+              "meta.line.f.uxl support.function.icon.uxl",
+              "meta.line.f.uxl string.other.link.uxl",
+              "meta.line.f.uxl variable.other.cols.uxl",
+              "meta.line.f.uxl support.type.font.uxl",
+              "meta.line.f.uxl keyword.control.goto.uxl",
+              "meta.line.f.uxl constant.numeric.uxl",
+              "meta.line.f.uxl constant.character.escape.uxl"
+            ],
+            "settings": {
+              "foreground": "#78c3ff"
+            }
+          }
+        ]
+      }
+    },
     "languages": [
       {
         "id": "uxl",

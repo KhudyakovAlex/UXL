@@ -30,6 +30,29 @@ P\home\Главная
 ```
 ```
 
-- В HTML: если внутри текста есть такие же fenced-блоки (как в `index.html` проекта).
+- В HTML: fenced-блоки внутри текста. Поддерживается как вариант с fence на отдельной строке, так и как в `index.html` проекта: `<pre ...>```UXL` и закрытие ` ```</pre>`.
+
+### Кастомизация цвета (тег P целиком)
+
+Расширение задаёт дефолт (начиная с `0.0.3`):
+- **`P\...`** — красным `#ff4d4d`
+- **`F\...`** — голубым `#78c3ff`
+
+Если захочешь поменять/отключить — в настройках Cursor/VS Code:
+
+```json
+"editor.tokenColorCustomizations": {
+  "textMateRules": [
+    {
+      "scope": "meta.line.p.uxl",
+      "settings": { "foreground": "#ff4d4d" }
+    },
+    {
+      "scope": "meta.line.f.uxl",
+      "settings": { "foreground": "#78c3ff" }
+    }
+  ]
+}
+```
 
 

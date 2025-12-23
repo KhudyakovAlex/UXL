@@ -6,14 +6,14 @@
   "patterns": [
     {
       "name": "meta.embedded.block.uxl",
-      "begin": "^\\s*```+\\s*(UXL|uxl)\\s*$",
+      "begin": "(```+)\\s*(UXL|uxl)\\s*$",
       "beginCaptures": {
-        "0": { "name": "punctuation.definition.fence.markdown" },
-        "1": { "name": "keyword.control.language.markdown" }
+        "1": { "name": "punctuation.definition.fence.markdown" },
+        "2": { "name": "keyword.control.language.markdown" }
       },
-      "end": "^\\s*```+\\s*$",
+      "end": "(```+)\\s*(?:</pre>\\s*)?$",
       "endCaptures": {
-        "0": { "name": "punctuation.definition.fence.markdown" }
+        "1": { "name": "punctuation.definition.fence.markdown" }
       },
       "contentName": "source.uxl",
       "patterns": [{ "include": "source.uxl" }]

@@ -6,6 +6,8 @@
     { "include": "#comment" },
     { "include": "#version" },
     { "include": "#windowSize" },
+    { "include": "#pTagLine" },
+    { "include": "#fTagLine" },
     { "include": "#tagLine" },
     { "include": "#fallbackTokens" }
   ],
@@ -31,6 +33,60 @@
         {
           "name": "constant.other.window-size.uxl",
           "match": "^\\s*\\d+\\s*[xX]\\s*\\d+\\s*[CS]?\\s*[CS]?\\s*$"
+        }
+      ]
+    },
+    "pTagLine": {
+      "patterns": [
+        {
+          "name": "meta.line.p.uxl",
+          "begin": "^\\s*(P)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.tag.uxl" }
+          },
+          "end": "$",
+          "patterns": [
+            { "include": "#fieldSep" },
+            { "include": "#quoted" },
+            { "include": "#outTok" },
+            { "include": "#inTok" },
+            { "include": "#sizeTok" },
+            { "include": "#colorTok" },
+            { "include": "#iconTok" },
+            { "include": "#srcTok" },
+            { "include": "#bgTok" },
+            { "include": "#colsTok" },
+            { "include": "#fontTok" },
+            { "include": "#gotoTok" },
+            { "include": "#numberTok" }
+          ]
+        }
+      ]
+    },
+    "fTagLine": {
+      "patterns": [
+        {
+          "name": "meta.line.f.uxl",
+          "begin": "^\\s*(F)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.tag.uxl" }
+          },
+          "end": "$",
+          "patterns": [
+            { "include": "#fieldSep" },
+            { "include": "#quoted" },
+            { "include": "#outTok" },
+            { "include": "#inTok" },
+            { "include": "#sizeTok" },
+            { "include": "#colorTok" },
+            { "include": "#iconTok" },
+            { "include": "#srcTok" },
+            { "include": "#bgTok" },
+            { "include": "#colsTok" },
+            { "include": "#fontTok" },
+            { "include": "#gotoTok" },
+            { "include": "#numberTok" }
+          ]
         }
       ]
     },

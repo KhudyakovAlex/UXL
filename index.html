@@ -19,7 +19,7 @@ P\controllers\Контроллеры\Список контроллеров, ко
 
   # Навигация
   F\OUT:T\IN:RT\100%x48
-    I\ICON:sliders:36\48x48\OUT:M10\#111111\GOTO:controllers_settings\Настройки контроллеров
+    I\ICON:sliders:36\48x48\OUT:M10\#111111\GOTO:settings\Настройки контроллеров
 
   # Основной контент
   F\100%x100%\IN:V
@@ -45,10 +45,51 @@ P\controllers\Контроллеры\Список контроллеров, ко
     S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
 
 
-P\controllers_settings\Настройки контроллеров\Настройки списка контроллеров
+P\settings\Настройки\Настройки приложения
   F\OUT:LT
     I\ICON:back:36\48x48\OUT:L:M10\#111111\GOTO:controllers\Назад к списку
-    C\Приложение\FONT:24\x48\OUT:L\#333333
+    C\Настройки\FONT:24\x48\OUT:L\#333333
+
+  # Основной контент
+  F\OUT:TL\IN:V
+    F
+      C\Тема
+      S\0\Светлая\Темная\140x40
+    F
+      C\Сетка
+      S\0\ICON:grid3x3:24\ICON:grid4x4:24\140x40\Варианты сетки контроллеров (ниже которая)
+  
+  F\OUT:TL\IN:H
+    I\ICON:search:36\48x48\OUT:M10\#111111\Кнопка поиска новых контроллеров на связи
+    I\ICON:trash:36\48x48\OUT:M10\#111111\Удаление контроллера (перетаскиваем на нее)
+
+  F\100%x100%\IN:V
+    F\
+      F\100x130\
+        I\ICON:box:100\100x100\#AAAAAA\OUT:T
+        C\Этаж1\OUT:T:M0\IN:M0\#AAAAAA
+      F\100x130\
+        I\ICON:box:100\100x100\OUT:T
+        C\Этаж2\OUT:T:M0\IN:M0
+      F\100x130\
+        I\ICON:grid1x1:100\\100x100\OUT:T\#AAAAAA  
+    F\
+      F\100x130\
+        I\ICON:box:100\100x100\#AAAAAA\OUT:T
+        C\Этаж3\OUT:T:M0\IN:M0\#AAAAAA
+      F\100x130\
+        I\ICON:box:100\100x100\#AAAAAA\OUT:T
+        C\Этаж4\OUT:T:M0\IN:M0\#AAAAAA
+      F\100x130\
+        I\ICON:grid1x1:100\\100x100\OUT:T\#AAAAAA
+
+    F\
+      F\100x130\
+        I\ICON:grid1x1:100\\100x100\OUT:T\#AAAAAA
+      F\100x130\
+        I\ICON:grid1x1:100\\100x100\OUT:T\#AAAAAA
+      F\100x130\
+        I\ICON:grid1x1:100\\100x100\OUT:T\#AAAAAA
 
   # Панель ИИ
   F\OUT:B\100%x48\#333333
