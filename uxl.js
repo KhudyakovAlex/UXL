@@ -343,6 +343,12 @@
             format: "T\\COLS:...\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/IN:L|IN:C|IN:R/HINT...] (поля в любом порядке; IN:M10 задаёт padding ячеек TH/TD)",
             example: "T\\COLS:20R,80L\\100%x100%\\OUT:T:M10\\IN:M6\\IN:L\\Таблица",
           };
+        case "S":
+          return {
+            format:
+              "S\\ID\\VALUE\\OPT\\OPT...[\\SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (VALUE — индекс 0..N-1; OPT: пусто (\\\\\\\\), текст или ICON:NAME[:SIZE])",
+            example: "S\\mode\\0\\\\\\ICON:grid3x3\\Сетка\\120x28\\OUT:LT:M6\\IN:M2\\Переключатель",
+          };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
         case "TD":
@@ -970,6 +976,7 @@
     }
 
     // Per-tag formats (ID is not used anywhere except P):
+    // S: S\ID\VALUE\OPT\OPT...[\...fields...]
     // B: B\CAPTION[\SIZE][\ALIGN][\ACTION][\HINT]
     // C: C\CAPTION[\SIZE][\ALIGN][\HINT]  (ACTION not used, but accepted/ignored in permissive via parseAction)
     // F: F[\SIZE][\ALIGN][\HINT]
@@ -1082,6 +1089,102 @@
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
       const inFlow = rest.inFlow || "";
       return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, inAlign, inFlow, bg, bgColor, ...common, rawLineNo: lineNo } };
+    }
+
+    if (tag === "S") {
+      const id = String(get(1) || "").trim();
+      const idRe = /^[A-Za-z0-9_-]+$/;
+      if (!id || !idRe.test(id)) throw formatError("S", "ID обязателен и должен быть [A-Za-z0-9_-]+.");
+      const valueRaw = String(get(2) || "").trim();
+      if (!valueRaw) throw formatError("S", "VALUE обязателен (индекс 0..N-1).");
+      const value = parseIntNonNegative(valueRaw, meta, "S VALUE");
+
+      const restTokensAll = fields.slice(3);
+      // Options go first, then optional unordered fields. Split at first token that looks like a field.
+      const isFieldToken = (t) => {
+        const v = String(t || "").trim();
+        if (!v) return false; // empty is a valid OPT
+        if (isSizeToken(v)) return true;
+        if (parseOutToken(v)) return true;
+        if (/^IN:/i.test(v)) return true;
+        if (isColorToken(v)) return true;
+        if (isBgToken(v) || isSrcToken(v) || isFitToken(v) || isColsToken(v)) return true;
+        if (isActionToken(v) || isGotoAfterToken(v)) return true;
+        if (isRadiusToken(v)) return true;
+        return false;
+      };
+      let splitAt = restTokensAll.length;
+      for (let i = 0; i < restTokensAll.length; i++) {
+        if (isFieldToken(restTokensAll[i])) {
+          splitAt = i;
+          break;
+        }
+      }
+      const optTokens = restTokensAll.slice(0, splitAt);
+      const restTokens = restTokensAll.slice(splitAt);
+
+      if (optTokens.length < 2) throw formatError("S", "Нужно минимум 2 варианта (OPT).");
+
+      const options = optTokens.map((raw) => {
+        const v = String(raw ?? "");
+        if (v === "") return { kind: "empty" };
+        if (isIconToken(v)) {
+          const raw2 = String(v.slice("ICON:".length)).trim();
+          if (!raw2) throw formatError("S", `ICON в варианте должен быть вида "ICON:NAME" или "ICON:NAME:16".`);
+          const parts = raw2.split(":").map((s) => s.trim()).filter(Boolean);
+          const name = String(parts[0] || "").toLowerCase();
+          const sizeRaw = parts[1] ?? "";
+          if (!name) throw formatError("S", `ICON в варианте должен быть вида "ICON:NAME" или "ICON:NAME:16".`);
+          if (!BUILTIN_BUTTON_ICONS.includes(name)) {
+            throw formatError("S", `Неизвестная иконка "${name}". Разрешены: ${BUILTIN_BUTTON_ICONS.join(", ")}.`);
+          }
+          let sizePx = null;
+          if (sizeRaw !== "") {
+            const n = parseIntNonNegative(sizeRaw, meta, "ICON size");
+            const min = 8;
+            const max = 48;
+            if (n < min || n > max) throw formatError("S", `ICON size должен быть в диапазоне ${min}..${max} px.`);
+            sizePx = n;
+          }
+          return { kind: "icon", name, sizePx };
+        }
+        return { kind: "text", text: v };
+      });
+
+      if (value >= options.length) throw formatError("S", `VALUE=${value} вне диапазона 0..${Math.max(0, options.length - 1)}.`);
+
+      for (const t of restTokens) {
+        if (isActionToken(t)) throw formatError("S", `ACTION запрещён (пока просто переключатель без действий).`);
+      }
+
+      const rest = parseUnorderedFields(restTokens, {
+        allowSize: true,
+        allowAlign: true,
+        allowInAlign: true,
+        allowAction: false,
+        allowHint: true,
+        allowCols: false,
+        allowMargin: true,
+        allowColor: true,
+      });
+      const sizeStr = rest.sizeStr;
+      const alignStr = rest.alignStr;
+      const hint = rest.hint;
+      const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
+      return {
+        indent,
+        node: {
+          tag,
+          id,
+          value,
+          options,
+          padding: rest.paddingPx ?? 2,
+          margin: rest.marginPx ?? 3,
+          color: rest.colorHex || "",
+          ...common,
+          rawLineNo: lineNo,
+        },
+      };
     }
 
     if (tag === "I") {
@@ -1199,7 +1302,7 @@
     }
 
     throw new UxlParseError(
-      `Неизвестный тег: "${tag}". Разрешены: P, F, I, B, C, T, TH, TD. См. UXL.md для форматов.`,
+      `Неизвестный тег: "${tag}". Разрешены: P, F, I, B, C, S, T, TH, TD. См. UXL.md для форматов.`,
       meta,
     );
   }
@@ -1377,7 +1480,7 @@
           });
         }
         for (const ch of kids) {
-          if (!["F", "B", "C", "T", "I"].includes(ch.tag)) {
+          if (!["F", "B", "C", "S", "T", "I"].includes(ch.tag)) {
             throw new UxlParseError(`Недопустимый дочерний тег "${ch.tag}" внутри P.`, {
               line: ch.rawLineNo,
               col: 1,
@@ -1388,7 +1491,7 @@
         }
       } else if (tag === "F") {
         for (const ch of kids) {
-          if (!["F", "B", "C", "T", "I"].includes(ch.tag)) {
+          if (!["F", "B", "C", "S", "T", "I"].includes(ch.tag)) {
             throw new UxlParseError(`Недопустимый дочерний тег "${ch.tag}" внутри F.`, {
               line: ch.rawLineNo,
               col: 1,
@@ -2011,6 +2114,51 @@
         if (cap.trim()) nodeEl.append(el("span", { class: "uxl-B__label", text: cap }));
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;
+      } else if (tag === "S") {
+        nodeEl = el("button", { class: "uxl-node uxl-S", type: "button", "data-uxl-uid": node.uid });
+        if (node.hint) nodeEl.title = node.hint;
+        if (Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
+
+        const opts = Array.isArray(node.options) ? node.options : [];
+        const n = opts.length;
+        let cur = Number.isFinite(node.value) ? node.value : 0;
+        if (n > 0) cur = Math.max(0, Math.min(n - 1, cur));
+
+        const segEls = [];
+        for (let i = 0; i < n; i++) {
+          const opt = opts[i] || {};
+          const seg = el("div", { class: "uxl-S__seg" });
+          if (opt.kind === "icon" && opt.name) {
+            const svg = svgIcon(opt.name, { className: "uxl-S__icon" });
+            if (svg) {
+              const s = Number.isFinite(opt.sizePx) ? opt.sizePx : null;
+              if (s != null) {
+                svg.style.width = `${s}px`;
+                svg.style.height = `${s}px`;
+              }
+              seg.append(svg);
+            }
+          } else if (opt.kind === "text") {
+            seg.append(el("span", { class: "uxl-S__text", text: String(opt.text ?? "") }));
+          } else {
+            // empty
+          }
+          nodeEl.append(seg);
+          segEls.push(seg);
+        }
+
+        const applyActive = () => {
+          for (let i = 0; i < segEls.length; i++) {
+            segEls[i].classList.toggle("uxl-S__seg--active", i === cur);
+          }
+        };
+        applyActive();
+
+        nodeEl.addEventListener("click", () => {
+          if (segEls.length < 2) return;
+          cur = (cur + 1) % segEls.length;
+          applyActive();
+        });
       } else if (tag === "I") {
         const hasAction = !!(node.action && node.action.type === "GOTO");
         nodeEl = el(hasAction ? "button" : "div", {
@@ -3717,7 +3865,7 @@
     const masked = [...lines];
     const htmlSegs = []; // {startLineNo,endLineNo,html}
 
-    const TAG_RE = /^\s*(P|F|I|B|C|T|TH|TD)(\\|$)/i;
+      const TAG_RE = /^\s*(P|F|I|B|C|S|T|TH|TD)(\\|$)/i;
     const WINDOW_RE = /^\s*\d+\s*x\s*\d+\s*([CS]\s*)?([CS]\s*)?$/i;
     const VERSION_RE = /^\s*UXL\s*:\s*/i;
 
