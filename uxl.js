@@ -58,7 +58,7 @@
     const trimmed = rawLine.trim();
     if (!trimmed) return true;
     const afterIndent = rawLine.replace(/^\s+/, "");
-    return afterIndent.startsWith(";") || afterIndent.startsWith("#");
+    return afterIndent.startsWith("#");
   }
 
   function countLeadingSpaces(line) {
@@ -3264,7 +3264,7 @@
       const trimmed = raw.trim();
       const isBlank = !trimmed;
       const afterIndent = raw.replace(/^\s+/, "");
-      const isComment = afterIndent.startsWith(";");
+      const isComment = afterIndent.startsWith("#");
       const isTag = TAG_RE.test(raw);
       const isWindow = WINDOW_RE.test(raw);
       const isVersion = VERSION_RE.test(raw);
@@ -3276,7 +3276,7 @@
       }
 
       // Treat as raw HTML line.
-      masked[i] = `${raw.match(/^\s*/)?.[0] || ""};__HTML__`;
+      masked[i] = `${raw.match(/^\s*/)?.[0] || ""}#__HTML__`;
       if (!cur) cur = { start: lineNo, end: lineNo, parts: [raw] };
       else {
         cur.end = lineNo;
