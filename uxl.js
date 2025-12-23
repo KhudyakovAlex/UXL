@@ -1950,10 +1950,14 @@
       return tag === "P" || tag === "F";
     }
 
-    function layoutContainer(node, containerDomEl, parentW, parentH, { root = false } = {}) {
+    function layoutContainer(node, containerDomEl, parentW, parentH, { root = false, baseOverride = null } = {}) {
       const pad = (node.tag === "P" || node.tag === "F") && Number.isFinite(node.padding) ? node.padding : 0;
       // Determine current container base size (as minimum) from its SIZE, otherwise from provided (root) or from children.
-      const base = root ? { w: parentW, h: parentH } : resolveBaseSize(node, parentW, parentH);
+      const baseRaw = root ? { w: parentW, h: parentH } : resolveBaseSize(node, parentW, parentH);
+      const base = {
+        w: baseOverride && baseOverride.w != null ? baseOverride.w : baseRaw.w,
+        h: baseOverride && baseOverride.h != null ? baseOverride.h : baseRaw.h,
+      };
       let cw = base.w ?? 0;
       let ch = base.h ?? 0;
       if (containerDomEl) containerDomEl.style.padding = `${pad}px`;
@@ -1991,15 +1995,14 @@
         else mid.push(chNode);
       }
 
-      // Inner content box size (percent sizes are based on it; children are positioned relative to padding edge).
-      const innerW = Math.max(0, cw - pad * 2);
-      const innerH = Math.max(0, ch - pad * 2);
-
-      // First, compute children sizes (recursively) with current container inner size as reference (for %).
-      const childSize = new Map(); // uid -> {w,h}
-      function computeChildSize(chNode, curW, curH) {
+      function computeChildSize(chNode, curW, curH, overrides = null) {
         const tag = chNode.tag;
-        const baseSz = resolveBaseSize(chNode, curW, curH);
+        const baseResolved = resolveBaseSize(chNode, curW, curH);
+        const ov = overrides ? overrides.get(chNode.uid) : null;
+        const baseSz = {
+          w: ov && ov.w != null ? ov.w : baseResolved.w,
+          h: ov && ov.h != null ? ov.h : baseResolved.h,
+        };
         let intrinsic;
 
         const chEl = domByUid.get(chNode.uid);
@@ -2027,7 +2030,7 @@
         }
         if (isContainerTag(tag)) {
           // Container child (F) size depends on its own kids, so recurse.
-          intrinsic = layoutContainer(chNode, chEl, curW, curH, { root: false });
+          intrinsic = layoutContainer(chNode, chEl, curW, curH, { root: false, baseOverride: baseSz });
         } else {
           const isPercentW = chNode.size?.w?.unit === "%";
           const isPercentH = chNode.size?.h?.unit === "%";
@@ -2073,10 +2076,98 @@
         return { w: wFinal + m * 2, h: hFinal + m * 2, innerW: wFinal, innerH: hFinal, m };
       }
 
-      // Iteration is handled by the outer loop; here we use cw/ch as the current container size.
-      for (const chNode of kids) {
-        childSize.set(chNode.uid, computeChildSize(chNode, innerW || parentW || 0, innerH || parentH || 0));
+      function buildPercentOverridesAndSizes(refW, refH) {
+        const overrides = new Map(); // uid -> {w,h} in px (border-box, without margins)
+
+        // Initialize: percent sizes are ignored until we resolve them from "free space".
+        for (const n of kids) {
+          const pw = n.size?.w?.unit === "%";
+          const ph = n.size?.h?.unit === "%";
+          if (!pw && !ph) continue;
+          overrides.set(n.uid, { w: pw ? 0 : null, h: ph ? 0 : null });
+        }
+
+        const computeAll = () => {
+          const childSize = new Map();
+          for (const chNode of kids) {
+            childSize.set(chNode.uid, computeChildSize(chNode, (refW ?? parentW ?? 0), (refH ?? parentH ?? 0), overrides));
+          }
+          return childSize;
+        };
+
+        const groupKey = (n) => {
+          const v = n.align?.v || null;
+          return v === "T" ? "top" : v === "B" ? "bottom" : "mid";
+        };
+
+        const allocAxis = (axis, availPx) => {
+          const percentNodesByGroup = new Map(); // group -> n[]
+          for (const n of kids) {
+            if (n.size?.[axis]?.unit !== "%") continue;
+            const g = groupKey(n);
+            const arr = percentNodesByGroup.get(g) || [];
+            arr.push(n);
+            percentNodesByGroup.set(g, arr);
+          }
+          if (percentNodesByGroup.size === 0) return;
+
+          // 1) Sizes for fixed nodes (percent nodes treated as 0 on this axis).
+          const sz1 = computeAll();
+
+          for (const [g, percentNodes] of percentNodesByGroup.entries()) {
+            const fixedSum = kids.reduce((acc, n) => {
+              if (groupKey(n) !== g) return acc;
+              if (n.size?.[axis]?.unit === "%") return acc;
+              return acc + (sz1.get(n.uid)?.[axis] || 0);
+            }, 0);
+            const remaining = Math.max(0, (availPx ?? 0) - fixedSum);
+
+            const weights = percentNodes.map((n) => Math.max(0, Number(n.size?.[axis]?.value || 0)));
+            const totalW = weights.reduce((a, b) => a + b, 0);
+            if (totalW <= 0) continue;
+
+            // Deterministic fair rounding: floor + distribute remainder by largest fractional parts.
+            const shares = weights.map((w) => (remaining * w) / totalW);
+            const base = shares.map((s) => Math.floor(s));
+            let rem = remaining - base.reduce((a, b) => a + b, 0);
+            const order = shares
+              .map((s, i) => ({ i, frac: s - Math.floor(s) }))
+              .sort((a, b) => (b.frac - a.frac) || (a.i - b.i));
+            for (let k = 0; k < order.length && rem > 0; k++, rem--) {
+              base[order[k].i] += 1;
+            }
+
+            for (let i = 0; i < percentNodes.length; i++) {
+              const n = percentNodes[i];
+              const outer = base[i] || 0;
+              const m = Number.isFinite(n.margin) ? n.margin : 0;
+              const borderBox = Math.max(0, outer - m * 2);
+              const prev = overrides.get(n.uid) || { w: null, h: null };
+              overrides.set(n.uid, { ...prev, [axis]: borderBox });
+            }
+          }
+        };
+
+        // Resolve percent widths first (affects text wrapping => intrinsic heights).
+        allocAxis("w", refW ?? 0);
+        // After width allocation, compute again to get correct fixed heights.
+        computeAll();
+        // Resolve percent heights (now that widths are known).
+        allocAxis("h", refH ?? 0);
+
+        // Final pass with resolved % sizes.
+        const childSizeFinal = computeAll();
+        return { overrides, childSize: childSizeFinal };
       }
+
+      // Inner content box size (percent sizes are based on it; children are positioned relative to padding edge).
+      // NOTE: percent sizes are based on "free space" inside this inner box, per UXL spec.
+      let innerW = Math.max(0, cw - pad * 2);
+      let innerH = Math.max(0, ch - pad * 2);
+
+      // 1) Size children based on current cw/ch
+      let pack = buildPercentOverridesAndSizes(innerW, innerH);
+      let childSize = pack?.childSize || new Map();
 
       // Compute required width/height for the container based on stacking rules (no overlaps).
       // Horizontal stacking within mid band: L-group, Center-group, R-group (each keeps UXL order)
@@ -2108,8 +2199,20 @@
       // Root (P) scrolls by default, so its size does not auto-grow.
       const contOw = node.size?.w?.overflow || (root ? windowSize.overflowW || "scroll" : null) || null;
       const contOh = node.size?.h?.overflow || (root ? windowSize.overflowH || "scroll" : null) || null;
-      if (!contOw) cw = Math.max(cw, neededW + pad * 2);
-      if (!contOh) ch = Math.max(ch, neededH + pad * 2);
+      const fixedW = node.size?.w?.unit === "%";
+      const fixedH = node.size?.h?.unit === "%";
+      if (!contOw && !fixedW) cw = Math.max(cw, neededW + pad * 2);
+      if (!contOh && !fixedH) ch = Math.max(ch, neededH + pad * 2);
+
+      // If cw/ch changed due to growth, recompute % allocations against the final inner box.
+      const nextInnerW = Math.max(0, cw - pad * 2);
+      const nextInnerH = Math.max(0, ch - pad * 2);
+      if (nextInnerW !== innerW || nextInnerH !== innerH) {
+        innerW = nextInnerW;
+        innerH = nextInnerH;
+        pack = buildPercentOverridesAndSizes(innerW, innerH);
+        childSize = pack?.childSize || childSize;
+      }
 
       // Now place children.
       const placeW = Math.max(0, cw - pad * 2);
