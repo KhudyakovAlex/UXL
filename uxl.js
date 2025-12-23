@@ -543,10 +543,12 @@
       "microphone",
       "plus",
       "search",
+      "sliders",
       "sun",
       "settings",
       "trash",
       "volume-2",
+      "volume-x",
     ]);
 
     function isMarginToken(s) {
@@ -1903,6 +1905,21 @@
     },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
     search: { viewBox: "0 0 24 24", d: ["M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15z", "M16.5 16.5 21 21"] },
+    sliders: {
+      viewBox: "0 0 24 24",
+      els: [
+        // Feather "sliders"
+        { tag: "line", attrs: { x1: "4", y1: "21", x2: "4", y2: "14" } },
+        { tag: "line", attrs: { x1: "4", y1: "10", x2: "4", y2: "3" } },
+        { tag: "line", attrs: { x1: "12", y1: "21", x2: "12", y2: "12" } },
+        { tag: "line", attrs: { x1: "12", y1: "8", x2: "12", y2: "3" } },
+        { tag: "line", attrs: { x1: "20", y1: "21", x2: "20", y2: "16" } },
+        { tag: "line", attrs: { x1: "20", y1: "12", x2: "20", y2: "3" } },
+        { tag: "line", attrs: { x1: "1", y1: "14", x2: "7", y2: "14" } },
+        { tag: "line", attrs: { x1: "9", y1: "8", x2: "15", y2: "8" } },
+        { tag: "line", attrs: { x1: "17", y1: "16", x2: "23", y2: "16" } },
+      ],
+    },
     sun: {
       viewBox: "0 0 24 24",
       els: [
@@ -1941,6 +1958,15 @@
       els: [
         { tag: "polygon", attrs: { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" } },
         { tag: "path", attrs: { d: "M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" } },
+      ],
+    },
+    "volume-x": {
+      viewBox: "0 0 24 24",
+      els: [
+        // Feather "volume-x"
+        { tag: "polygon", attrs: { points: "11 5 6 9 2 9 2 15 6 15 11 19 11 5" } },
+        { tag: "line", attrs: { x1: "23", y1: "9", x2: "17", y2: "15" } },
+        { tag: "line", attrs: { x1: "17", y1: "9", x2: "23", y2: "15" } },
       ],
     },
   });
