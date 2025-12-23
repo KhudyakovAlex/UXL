@@ -58,7 +58,7 @@
     const trimmed = rawLine.trim();
     if (!trimmed) return true;
     const afterIndent = rawLine.replace(/^\s+/, "");
-    return afterIndent.startsWith(";");
+    return afterIndent.startsWith(";") || afterIndent.startsWith("#");
   }
 
   function countLeadingSpaces(line) {
