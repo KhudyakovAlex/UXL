@@ -1,0 +1,41 @@
+{
+  "name": "uxl-syntax",
+  "displayName": "UXL Syntax Highlighting",
+  "description": "Syntax highlighting for User Experience Language (UXL) in Markdown and HTML.",
+  "version": "0.0.1",
+  "publisher": "uxl-local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "uxl",
+        "aliases": ["UXL", "uxl"],
+        "extensions": [".uxl", ".uxl.txt"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "uxl",
+        "scopeName": "source.uxl",
+        "path": "./syntaxes/uxl.tmLanguage.json"
+      },
+      {
+        "scopeName": "text.html.markdown.uxl.injection",
+        "path": "./syntaxes/uxl-markdown.injection.tmLanguage.json",
+        "injectTo": ["text.html.markdown"]
+      },
+      {
+        "scopeName": "text.html.basic.uxl.injection",
+        "path": "./syntaxes/uxl-html.injection.tmLanguage.json",
+        "injectTo": ["text.html.basic", "text.html.derivative"]
+      }
+    ]
+  }
+}
+
+

@@ -1,0 +1,156 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "UXL",
+  "scopeName": "source.uxl",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#version" },
+    { "include": "#windowSize" },
+    { "include": "#tagLine" },
+    { "include": "#fallbackTokens" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.uxl",
+          "match": "^\\s*#.*$"
+        }
+      ]
+    },
+    "version": {
+      "patterns": [
+        {
+          "name": "meta.header.uxl",
+          "match": "^\\s*UXL\\s*:\\s*\\d+(?:\\.\\d+){1,2}\\s*$"
+        }
+      ]
+    },
+    "windowSize": {
+      "patterns": [
+        {
+          "name": "constant.other.window-size.uxl",
+          "match": "^\\s*\\d+\\s*[xX]\\s*\\d+\\s*[CS]?\\s*[CS]?\\s*$"
+        }
+      ]
+    },
+    "tagLine": {
+      "patterns": [
+        {
+          "name": "meta.line.uxl",
+          "begin": "^\\s*(P|F|I|B|C|S|T|TH|TD)\\b",
+          "beginCaptures": {
+            "1": { "name": "keyword.control.tag.uxl" }
+          },
+          "end": "$",
+          "patterns": [
+            { "include": "#fieldSep" },
+            { "include": "#quoted" },
+            { "include": "#outTok" },
+            { "include": "#inTok" },
+            { "include": "#sizeTok" },
+            { "include": "#colorTok" },
+            { "include": "#iconTok" },
+            { "include": "#srcTok" },
+            { "include": "#bgTok" },
+            { "include": "#colsTok" },
+            { "include": "#fontTok" },
+            { "include": "#gotoTok" },
+            { "include": "#numberTok" }
+          ]
+        }
+      ]
+    },
+    "fieldSep": {
+      "patterns": [
+        { "name": "punctuation.separator.field.uxl", "match": "\\\\" }
+      ]
+    },
+    "quoted": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.uxl",
+          "match": "\"(?:\\\\.|[^\"\\\\])*\""
+        }
+      ]
+    },
+    "outTok": {
+      "patterns": [
+        {
+          "name": "keyword.other.out.uxl",
+          "match": "\\bOUT:[^\\\\\\s]+"
+        }
+      ]
+    },
+    "inTok": {
+      "patterns": [
+        {
+          "name": "keyword.other.in.uxl",
+          "match": "\\bIN:[^\\\\\\s]+"
+        }
+      ]
+    },
+    "sizeTok": {
+      "patterns": [
+        {
+          "name": "constant.other.size.uxl",
+          "match": "\\b(\\d+%?[CS]?)?[xX](\\d+%?[CS]?)?\\b"
+        }
+      ]
+    },
+    "colorTok": {
+      "patterns": [
+        {
+          "name": "constant.other.color.uxl",
+          "match": "#[0-9a-fA-F]{6}\\b"
+        }
+      ]
+    },
+    "iconTok": {
+      "patterns": [
+        {
+          "name": "support.function.icon.uxl",
+          "match": "\\bICON:[a-zA-Z0-9_-]+(?::\\d+)?\\b"
+        }
+      ]
+    },
+    "srcTok": {
+      "patterns": [
+        { "name": "string.other.link.uxl", "match": "\\bSRC:[^\\\\\\s]+" }
+      ]
+    },
+    "bgTok": {
+      "patterns": [
+        { "name": "string.other.link.uxl", "match": "\\bBG:[^\\\\\\s]+" }
+      ]
+    },
+    "colsTok": {
+      "patterns": [
+        { "name": "variable.other.cols.uxl", "match": "\\bCOLS:[^\\\\\\s]+" }
+      ]
+    },
+    "fontTok": {
+      "patterns": [
+        { "name": "support.type.font.uxl", "match": "\\bFONT:\\d+(?::[BI]{1,2})?\\b" }
+      ]
+    },
+    "gotoTok": {
+      "patterns": [
+        { "name": "keyword.control.goto.uxl", "match": "\\bGOTO:[^\\\\\\s]+" },
+        { "name": "keyword.control.goto.uxl", "match": "\\bGOTOAFTER:[0-9]+(?:\\.[0-9]+)?\\b" }
+      ]
+    },
+    "numberTok": {
+      "patterns": [
+        { "name": "constant.numeric.uxl", "match": "\\b\\d+\\b" }
+      ]
+    },
+    "fallbackTokens": {
+      "patterns": [
+        { "name": "constant.character.escape.uxl", "match": "\\\\\\\\|\\\\\"" }
+      ]
+    }
+  }
+}
+
+

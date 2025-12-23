@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "UXL (HTML fenced block injection)",
+  "scopeName": "text.html.basic.uxl.injection",
+  "injectionSelector": "L:text.html.basic, L:text.html.derivative",
+  "patterns": [
+    {
+      "name": "meta.embedded.block.uxl",
+      "begin": "^\\s*```+\\s*(UXL|uxl)\\s*$",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.fence.markdown" },
+        "1": { "name": "keyword.control.language.markdown" }
+      },
+      "end": "^\\s*```+\\s*$",
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.fence.markdown" }
+      },
+      "contentName": "source.uxl",
+      "patterns": [{ "include": "source.uxl" }]
+    }
+  ]
+}
+
+
