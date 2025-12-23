@@ -2030,10 +2030,18 @@
     if (err.sourceName) metaParts.push(err.sourceName);
     if (err.line != null) metaParts.push(`line ${err.line}`);
     if (err.col != null) metaParts.push(`col ${err.col}`);
-    const meta = el("div", { class: "uxl-error__meta", text: `${metaParts.join(": ")}\n${err.message}` });
+    const where = metaParts.join(": ");
+    const name = String(err?.name || "Error");
+    const msg = String(err?.message || "");
+    const ver = `renderer ${RENDERER_VERSION} / uxl ${SUPPORTED_UXL_VERSION}`;
+    const meta = el("div", { class: "uxl-error__meta", text: `${where}\n${ver}\n${name}: ${msg}` });
     const box = el("div", { class: "uxl-error" }, [head, meta]);
     if (err.lineText) {
       box.append(el("div", { class: "uxl-error__line", text: err.lineText }));
+    }
+    const stack = String(err?.stack || "").trim();
+    if (stack) {
+      box.append(el("pre", { class: "uxl-error__details", text: stack }));
     }
     root.append(box);
     return root;

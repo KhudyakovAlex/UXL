@@ -138,6 +138,20 @@
   overflow: auto;
 }
 
+.uxl-error__details {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--uxl-border);
+  background: color-mix(in srgb, var(--uxl-panel) 70%, #ffffff);
+  color: var(--uxl-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: pre-wrap;
+  overflow: auto;
+  max-height: 240px;
+}
+
 /* Map */
 .uxl-map {
   position: relative;
