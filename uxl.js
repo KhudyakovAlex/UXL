@@ -317,11 +317,11 @@
       switch (t) {
         case "P":
           return {
-            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, GOTOAFTER:3, HINT)",
-            example: "P\\users\\Пользователи\\GOTOAFTER:3\\IN:M12\\Подсказка страницы",
+            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, IN:<ALIGN>, IN:H|IN:V, GOTOAFTER:3, HINT)",
+            example: "P\\users\\Пользователи\\GOTOAFTER:3\\IN:M12\\IN:LT\\IN:V\\Подсказка страницы",
           };
         case "F":
-          return { format: "F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/#RRGGBB/BG:<url>/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\IN:M12\\#f0f0f0\\Контейнер" };
+          return { format: "F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/IN:H|IN:V/#RRGGBB/BG:<url>/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\IN:M12\\IN:H\\#f0f0f0\\Контейнер" };
         case "I":
           return {
             format:
@@ -425,12 +425,13 @@
       const v = String(raw || "").trim();
       if (!/^IN:/i.test(v)) return null;
       const rest = v.slice(3);
-      if (!rest) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].', meta);
+      if (!rest) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].', meta);
       const parts = rest.split(":").map((p) => p.trim()).filter(Boolean);
-      if (!parts.length) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].', meta);
+      if (!parts.length) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].', meta);
 
       let align = "";
       let paddingPx = null;
+      let flow = "";
 
       for (const p of parts) {
         if (/^M\d+$/i.test(p)) {
@@ -439,19 +440,25 @@
           paddingPx = n;
           continue;
         }
+        if (/^[HV]$/i.test(p)) {
+          const up = p.toUpperCase();
+          if (flow) throw new UxlParseError("IN: FLOW (H/V) указан более одного раза.", meta);
+          flow = up; // H or V
+          continue;
+        }
         const up = p.toUpperCase();
         if (isAlignToken(up)) {
           if (align) throw new UxlParseError("IN: ALIGN указан более одного раза.", meta);
           align = up;
           continue;
         }
-        throw new UxlParseError(`IN: неизвестная часть "${p}". Ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].`, meta);
+        throw new UxlParseError(`IN: неизвестная часть "${p}". Ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].`, meta);
       }
 
-      if (!align && paddingPx == null) {
-        throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].', meta);
+      if (!align && paddingPx == null && !flow) {
+        throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].', meta);
       }
-      return { align, paddingPx };
+      return { align, paddingPx, flow };
     }
 
     function isActionToken(s) {
@@ -619,6 +626,7 @@
       let gotoAfterSec = null;
       let colorHex = "";
     let fontSpec = null;
+      let inFlow = "";
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -634,6 +642,11 @@
         if (kind === "inAlign") {
           if (inAlignStr) throw formatError(tag, "IN:ALIGN указан более одного раза.");
           inAlignStr = val;
+          return;
+        }
+        if (kind === "inFlow") {
+          if (inFlow) throw formatError(tag, "IN:FLOW (H/V) указан более одного раза.");
+          inFlow = val;
           return;
         }
         if (kind === "action") {
@@ -833,10 +846,15 @@
           if (!allowInAlign) throw formatError(tag, `Поле "${v}" (IN) не поддерживается для этого тега.`);
           if (inTok.align) setOnce("inAlign", inTok.align);
           if (inTok.paddingPx != null) setOnce("padding", inTok.paddingPx);
+          if (inTok.flow) {
+            // Flow makes sense only for containers.
+            if (tag !== "P" && tag !== "F") throw formatError(tag, `Поле "${v}" (IN flow) не поддерживается для этого тега.`);
+            setOnce("inFlow", inTok.flow);
+          }
           continue;
         }
         if (/^IN:/i.test(v)) {
-          throw formatError(tag, `Поле "${v}" не распознано. Ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].`);
+          throw formatError(tag, `Поле "${v}" не распознано. Ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].`);
         }
         const out = parseOutToken(v);
         if (out) {
@@ -864,6 +882,7 @@
         sizeStr,
         alignStr,
         inAlignStr,
+        inFlow,
         actionStr,
         hint,
         colsSpec,
@@ -916,7 +935,8 @@
       const padding = rest.paddingPx ?? 0;
       const gotoAfterSec = rest.gotoAfterSec;
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
-      return { indent, node: { tag, id, caption, padding, inAlign, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
+      const inFlow = rest.inFlow || "";
+      return { indent, node: { tag, id, caption, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -1034,7 +1054,8 @@
       const bgColor = rest.colorHex || "";
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
-      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, inAlign, bg, bgColor, ...common, rawLineNo: lineNo } };
+      const inFlow = rest.inFlow || "";
+      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, inAlign, inFlow, bg, bgColor, ...common, rawLineNo: lineNo } };
     }
 
     if (tag === "I") {
@@ -2048,6 +2069,7 @@
 
     function layoutContainer(node, containerDomEl, parentW, parentH, { root = false, baseOverride = null } = {}) {
       const pad = (node.tag === "P" || node.tag === "F") && Number.isFinite(node.padding) ? node.padding : 0;
+      const inFlow = String(node.inFlow || "").trim().toUpperCase(); // "" | "H" | "V"
       // Determine current container base size (as minimum) from its SIZE, otherwise from provided (root) or from children.
       const baseRaw = root ? { w: parentW, h: parentH } : resolveBaseSize(node, parentW, parentH);
       const base = {
@@ -2308,15 +2330,15 @@
       const maxH = (arr) => arr.reduce((a, n) => Math.max(a, childSize.get(n.uid)?.h || 0), 0);
       const maxW = (arr) => arr.reduce((a, n) => Math.max(a, childSize.get(n.uid)?.w || 0), 0);
 
-      const topH = sumH(top);
-      const bottomH = sumH(bottom);
-      const midH = maxH(mid);
+      // IN flow affects "same-anchor stacking" and therefore required band sizes.
+      const topH = inFlow === "H" ? maxH(top) : sumH(top);
+      const bottomH = inFlow === "H" ? maxH(bottom) : sumH(bottom);
+      const midH = inFlow === "V" ? Math.max(sumH(midL), sumH(midC), sumH(midR)) : maxH(mid);
       const neededH = topH + midH + bottomH;
 
-      const neededW = Math.max(
-        maxW(kids),
-        sumW(midL) + sumW(midC) + sumW(midR),
-      );
+      const midNeededW = inFlow === "V" ? maxW(midL) + maxW(midC) + maxW(midR) : sumW(midL) + sumW(midC) + sumW(midR);
+      const bandNeededW = inFlow === "H" ? Math.max(sumW(top), sumW(bottom)) : 0;
+      const neededW = Math.max(maxW(kids), midNeededW, bandNeededW);
 
       // Apply container growth by default (unless crop/scroll is set on that axis, in which case size is fixed to base).
       // Root (P) scrolls by default, so its size does not auto-grow.
@@ -2358,6 +2380,100 @@
         return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
       }
 
+      function splitByHAlign(nodes) {
+        const L = [];
+        const C = [];
+        const R = [];
+        for (const n of nodes) {
+          const hA = effAlign(n).h || null;
+          if (hA === "L") L.push(n);
+          else if (hA === "R") R.push(n);
+          else C.push(n);
+        }
+        return { L, C, R };
+      }
+
+      function placeBandByFlow(nodes, { vAlign }) {
+        if (inFlow !== "H" && inFlow !== "V") return null;
+        const { L, C, R } = splitByHAlign(nodes);
+        const placed = [];
+
+        if (inFlow === "H") {
+          // Pack 3 blocks without overlaps: L (left->right), C (center), R (right->left)
+          const leftW = sumW(L);
+          const rightW = sumW(R);
+          const centerW = sumW(C);
+          const rem = Math.max(0, placeW - leftW - rightW);
+          const xC = leftW + Math.max(0, Math.round((rem - centerW) / 2));
+
+          // L block
+          let x = 0;
+          for (const n of L) {
+            const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+            const y = vAlign === "T" ? 0 : Math.max(0, placeH - sz.h);
+            applyBoxStyles(n.uid, x, y);
+            placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+            x += sz.w;
+          }
+          // C block
+          x = xC;
+          for (const n of C) {
+            const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+            const y = vAlign === "T" ? 0 : Math.max(0, placeH - sz.h);
+            applyBoxStyles(n.uid, x, y);
+            placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+            x += sz.w;
+          }
+          // R block (right->left)
+          x = placeW;
+          for (let i = R.length - 1; i >= 0; i--) {
+            const n = R[i];
+            const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+            x -= sz.w;
+            const y = vAlign === "T" ? 0 : Math.max(0, placeH - sz.h);
+            applyBoxStyles(n.uid, x, y);
+            placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+          }
+          return placed;
+        }
+
+        // inFlow === "V": stack per h-group.
+        const stackDown = (arr) => {
+          let y = 0;
+          for (const n of arr) {
+            const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+            const hA = effAlign(n).h || null;
+            const pref = alignToXY({ hAlign: hA, vAlign, parentW: placeW, parentH: placeH, w: sz.w, h: sz.h });
+            const x = pref.x;
+            applyBoxStyles(n.uid, x, y);
+            placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+            y += sz.h;
+          }
+        };
+        const stackUp = (arr) => {
+          let y = placeH;
+          for (const n of arr) {
+            const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+            const hA = effAlign(n).h || null;
+            const pref = alignToXY({ hAlign: hA, vAlign, parentW: placeW, parentH: placeH, w: sz.w, h: sz.h });
+            const x = pref.x;
+            y -= sz.h;
+            applyBoxStyles(n.uid, x, y);
+            placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+          }
+        };
+        if (vAlign === "T") {
+          stackDown(L);
+          stackDown(C);
+          stackDown(R);
+        } else {
+          stackUp(L);
+          stackUp(C);
+          stackUp(R);
+        }
+        return placed;
+      }
+
       function placeBand(nodes, { vAlign, pushDown }) {
         // vAlign is "T" or "B". If overlaps occur, move along Y away from the edge:
         // - top band: push down
@@ -2395,11 +2511,11 @@
       }
 
       // 1) Top band: prefer y=0; on overlap push down (keep RT in the corner unless it intersects)
-      const placedTop = placeBand(top, { vAlign: "T", pushDown: true });
+      const placedTop = placeBandByFlow(top, { vAlign: "T" }) || placeBand(top, { vAlign: "T", pushDown: true });
       const topExtent = placedTop.reduce((m, r) => Math.max(m, r.y + r.h), 0);
 
       // 2) Bottom band: prefer bottom; on overlap push up
-      const placedBottom = placeBand(bottom, { vAlign: "B", pushDown: false });
+      const placedBottom = placeBandByFlow(bottom, { vAlign: "B" }) || placeBand(bottom, { vAlign: "B", pushDown: false });
       const bottomStart = placedBottom.length ? placedBottom.reduce((m, r) => Math.min(m, r.y), placeH) : placeH;
 
       // 3) Middle band: horizontal packing between top and bottom, centered vertically in the remaining space.
@@ -2407,42 +2523,78 @@
       const midAreaH = Math.max(0, bottomStart - topExtent);
       const midY = midAreaY + Math.max(0, Math.round((midAreaH - midH) / 2));
 
-      const leftW = sumW(midL);
-      const rightW = sumW(midR);
-      const centerW = sumW(midC);
+      const leftW = inFlow === "V" ? maxW(midL) : sumW(midL);
+      const rightW = inFlow === "V" ? maxW(midR) : sumW(midR);
+      const centerW = inFlow === "V" ? maxW(midC) : sumW(midC);
       const contentW = leftW + centerW + rightW;
       // cw already accounts for neededW (which includes contentW) above.
 
-      // L group: left to right
-      let xL = 0;
-      for (const n of midL) {
-        const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-        const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
-        applyBoxStyles(n.uid, xL, y);
-        xL += sz.w;
-      }
+      if (inFlow === "V") {
+        // Columns: L, C, R in the middle band. Each column stacks top-to-bottom.
+        const betweenL = leftW;
+        const betweenR = Math.max(0, placeW - rightW);
+        const space = Math.max(0, betweenR - betweenL);
+        const startC = betweenL + Math.max(0, Math.round((space - centerW) / 2));
 
-      // R group: right to left
-      let xR = placeW;
-      for (let i = midR.length - 1; i >= 0; i--) {
-        const n = midR[i];
-        const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-        xR -= sz.w;
-        const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
-        applyBoxStyles(n.uid, xR, y);
-      }
+        // L column
+        let y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midL)) / 2));
+        for (const n of midL) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          applyBoxStyles(n.uid, 0, y);
+          y += sz.h;
+        }
 
-      // Center group: packed left-to-right, but centered between L and R if possible.
-      const betweenL = xL;
-      const betweenR = xR;
-      const space = Math.max(0, betweenR - betweenL);
-      const startC = betweenL + Math.max(0, Math.round((space - centerW) / 2));
-      let xC = startC;
-      for (const n of midC) {
-        const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-        const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
-        applyBoxStyles(n.uid, xC, y);
-        xC += sz.w;
+        // C column (center items within the column width)
+        y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midC)) / 2));
+        for (const n of midC) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const x = startC + Math.max(0, Math.round((centerW - sz.w) / 2));
+          applyBoxStyles(n.uid, x, y);
+          y += sz.h;
+        }
+
+        // R column (right-align items within the column width)
+        y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midR)) / 2));
+        const baseX = Math.max(0, placeW - rightW);
+        for (const n of midR) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const x = baseX + Math.max(0, rightW - sz.w);
+          applyBoxStyles(n.uid, x, y);
+          y += sz.h;
+        }
+      } else {
+        // Default: rows (legacy behavior)
+        // L group: left to right
+        let xL = 0;
+        for (const n of midL) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
+          applyBoxStyles(n.uid, xL, y);
+          xL += sz.w;
+        }
+
+        // R group: right to left
+        let xR = placeW;
+        for (let i = midR.length - 1; i >= 0; i--) {
+          const n = midR[i];
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          xR -= sz.w;
+          const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
+          applyBoxStyles(n.uid, xR, y);
+        }
+
+        // Center group: packed left-to-right, but centered between L and R if possible.
+        const betweenL = xL;
+        const betweenR = xR;
+        const space = Math.max(0, betweenR - betweenL);
+        const startC = betweenL + Math.max(0, Math.round((space - centerW) / 2));
+        let xC = startC;
+        for (const n of midC) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
+          applyBoxStyles(n.uid, xC, y);
+          xC += sz.w;
+        }
       }
 
       return { w: cw, h: ch };

@@ -63,6 +63,7 @@
 Правило (кроме таблиц): для `B/C/F/T` поля (кроме `CAPTION` у `B/C`) могут идти **в любом порядке** и распознаются по виду:
 - `SIZE`: содержит `x`
 - `ALIGN`: задаётся как `OUT:<ALIGN>` (например `OUT:LT`, `OUT:B`, `OUT:C`, `OUT:M`, `OUT:CM`; по каждой оси только одно: L/R/C и T/B/M)
+- `IN`: для контейнеров `P/F` поддерживается `IN:<ALIGN>` (дефолтное выравнивание детей), `IN:M<number>` (padding), `IN:H|IN:V` (выстраивание детей с одинаковыми якорями)
 - `ACTION`: начинается с `GOTO:`
 - `ICON`: `ICON:<name>[:size]` (встроенная пиктограмма для `B`, без внешних файлов). Пример: `ICON:search:18` (px, 8..48). Разрешены: ai, arrow-left, arrow-right, back, box, chevron-left, chevron-right, close, codepen, cpu, edit, grid, home, loader, microphone, plus, search, sun, settings, trash, volume-2. В `B` допускается форма `B\ICON:...` (иконка‑только, без CAPTION).
 - `MARGIN`: задаётся **только внутри `OUT`** как `OUT:...:M<number>` (целые px, одно значение на все стороны; влияет на layout)
