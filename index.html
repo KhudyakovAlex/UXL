@@ -11,8 +11,47 @@
       <pre class="uxl-md-block">```UXL
 400x700
 
-P\Главная
-  B\Hello UXL!
+P\splash\Splash-окно\GOTOAFTER:2\Ну куда же без него... Пока грузится приложуха
+  I\SRC:assets/img/splash_logo.png\300x300\FIT
+
+P\controllers\Контроллеры\Список контроллеров, которые на связи, и те, к которым когда-то подключались
+
+  I\ICON:settings:36\48x48\RT\M10\#111111\GOTO:controllers_settings\Настройки контроллеров
+
+  F
+    F\T\P0
+      F\100x130\P0
+        I\ICON:box:100\100x100\#AAAAAA\T
+        C\Этаж1\T\M0\P0\#AAAAAA
+      F\100x130\P0
+        I\ICON:box:100\GOTO:controller\100x100\T\Контроллер на связи
+        C\Этаж2\T\M0\P0
+    F\T\P0
+      F\100x130\P0
+        I\ICON:box:100\100x100\#AAAAAA\T
+        C\Этаж3\T\M0\P0\#AAAAAA
+      F\100x130\P0
+        I\ICON:box:100\100x100\#AAAAAA\T\Контроллер не на связи
+        C\Этаж4\T\M0\P0\#AAAAAA
+  F\B\100%x48\#333333
+    I\ICON:ai:36\48x48\M10\#FFFFFF\Кнопка вызова ИИ-джина
+  I\ICON:loader:36\B\48x48\M10\#777777\Крутилка поиска новых контроллеров
+
+P\controllers_settings\Настройки контроллеров\Настройки списка контроллеров
+  F\LT
+    I\ICON:back:36\48x48\L\M10\#111111\GOTO:controllers\Назад к списку
+    C\Приложение\FONT:24\x48\L\#333333
+
+  F\B\100%x48\#333333
+    I\ICON:ai:36\48x48\M10\#FFFFFF\Кнопка вызова ИИ-джина
+
+P\controller\Контроллер\Страница конкретного контроллера
+  F\LT
+    I\ICON:back:36\48x48\L\M10\#111111\GOTO:controllers\Назад к списку
+    C\Этаж2\FONT:24\x48\L\#333333
+
+  F\B\100%x48\#333333
+    I\ICON:ai:36\48x48\M10\#FFFFFF\Кнопка вызова ИИ-джина
 
 ```</pre>
     </div>

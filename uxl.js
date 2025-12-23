@@ -284,18 +284,18 @@
     return null; // permissive: ignore
   }
 
-  function ensureTrailingBackslashAbsent(rawLine, meta, mode) {
-    // Spec says trailing '\' is forbidden. In permissive, we still treat it as error by default,
-    // because it breaks field counting; if needed, can be relaxed later.
+  function stripTrailingBackslash(rawLine) {
+    // Allow trailing '\' (treated as if it wasn't there). Trim only the final backslash with trailing spaces.
     if (rawLine.trimEnd().endsWith("\\")) {
-      throw new UxlParseError('Завершающий "\\" запрещен: если дальше нет полей, "\\" не пишется.', meta);
+      return rawLine.replace(/\s*\\\s*$/, "");
     }
+    return rawLine;
   }
 
   function parseTagLine(rawLine, lineNo, sourceName, mode) {
     const meta = { line: lineNo, col: 1, sourceName, lineText: rawLine };
     assertNoTabs(rawLine, meta);
-    ensureTrailingBackslashAbsent(rawLine, meta, mode);
+    rawLine = stripTrailingBackslash(rawLine);
 
     const indent = countLeadingSpaces(rawLine);
     if (indent % 2 !== 0) {
@@ -312,15 +312,16 @@
       switch (t) {
         case "P":
           return {
-            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: P10=padding, HINT)",
-            example: "P\\users\\Пользователи\\P12\\Подсказка страницы",
+            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: P10=padding, GOTOAFTER:3, HINT)",
+            example: "P\\users\\Пользователи\\GOTOAFTER:3\\P12\\Подсказка страницы",
           };
         case "F":
-          return { format: "F\\[SIZE/ALIGN/P10/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\Контейнер" };
+          return { format: "F\\[SIZE/ALIGN/P10/#RRGGBB/BG:<url>/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\#f0f0f0\\Контейнер" };
         case "I":
           return {
-            format: "I\\SRC:<url>\\[SIZE/ALIGN/FIT|CROP/M10/R6/HINT...] (поля в любом порядке; без PADDING)",
-            example: "I\\SRC:src/yarmap.PNG\\200x\\LT\\M6\\R12\\FIT\\Подсказка картинки",
+            format:
+              'I\\SRC:<url>|<iconName>\\[SIZE/ALIGN/FIT|CROP/ICON:NAME[:SIZE]/M10/R6/HINT...] (поля в любом порядке; без PADDING). Если SRC — это имя встроенной иконки, рисуется SVG-иконка.',
+            example: "I\\home\\24x24\\LT\\Подсказка иконки",
           };
         case "B":
           return {
@@ -328,7 +329,10 @@
             example: "B\\ICON:search:18\\100x\\RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
           };
         case "C":
-          return { format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке)", example: "C\\Текст\\x20\\LT\\P6\\M4\\Подсказка" };
+          return {
+            format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
+            example: "C\\Текст\\x20\\LT\\P6\\M4\\FONT:24:BI\\Подсказка",
+          };
         case "T":
           return {
             format: "T\\COLS:...\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке; P10 задаёт padding ячеек TH/TD)",
@@ -412,6 +416,17 @@
       return /^BG:/i.test(v);
     }
 
+    function isColorToken(s) {
+      const v = String(s || "").trim();
+      return /^#[0-9a-fA-F]{6}$/.test(v);
+    }
+
+    function parseColorHex(raw, metaForErr) {
+      const v = String(raw || "").trim();
+      if (!/^#[0-9a-fA-F]{6}$/.test(v)) throw new UxlParseError('COLOR должен быть в формате "#RRGGBB" (например "#001122").', metaForErr);
+      return `#${v.slice(1).toLowerCase()}`;
+    }
+
     function parseIntNonNegative(raw, metaForErr, what) {
       const n = Number.parseInt(String(raw), 10);
       if (!Number.isFinite(n) || String(n) !== String(raw).trim()) {
@@ -435,6 +450,7 @@
       "edit",
       "grid",
       "home",
+      "loader",
       "microphone",
       "plus",
       "search",
@@ -459,6 +475,39 @@
       return /^R\d+$/i.test(v);
     }
 
+    function isGotoAfterToken(s) {
+      const v = String(s || "").trim();
+      return /^GOTOAFTER:(\d+(?:\.\d+)?)$/i.test(v);
+    }
+
+    function parseGotoAfterSeconds(token, metaForErr) {
+      const m = /^GOTOAFTER:(\d+(?:\.\d+)?)$/i.exec(String(token || "").trim());
+      if (!m) throw new UxlParseError(`Некорректный формат GOTOAFTER (ожидается "GOTOAFTER:3" или "GOTOAFTER:1.5").`, metaForErr);
+      const sec = Number.parseFloat(m[1]);
+      if (!Number.isFinite(sec)) throw new UxlParseError("GOTOAFTER должно быть числом секунд.", metaForErr);
+      if (sec < 0) throw new UxlParseError("GOTOAFTER должно быть >= 0.", metaForErr);
+      return sec;
+    }
+
+  function isFontToken(s) {
+    const v = String(s || "").trim();
+    return /^FONT:/i.test(v);
+  }
+
+  function parseFontToken(token, metaForErr) {
+    const raw = String(token || "").trim();
+    const m = /^FONT:(\d+)(?::([BI]{1,2}))?$/i.exec(raw);
+    if (!m) throw new UxlParseError('FONT должен быть вида "FONT:24" или "FONT:24:BI" (B=bold, I=italic).', metaForErr);
+    const sizePx = Number.parseInt(m[1], 10);
+    if (!Number.isFinite(sizePx) || sizePx <= 0) throw new UxlParseError("FONT размер должен быть целым числом > 0 (px).", metaForErr);
+    const flags = (m[2] || "").toUpperCase();
+    const uniqueFlags = new Set(flags.split("").filter(Boolean));
+    if ([...uniqueFlags].some((f) => f !== "B" && f !== "I")) {
+      throw new UxlParseError('FONT флаги поддерживают только B (bold) и I (italic).', metaForErr);
+    }
+    return { sizePx, bold: uniqueFlags.has("B"), italic: uniqueFlags.has("I") };
+  }
+
     function parseUnorderedFields(
       tokens,
       {
@@ -474,6 +523,9 @@
         allowSrc = false,
         allowFit = false,
         allowBg = false,
+        allowGotoAfter = false,
+        allowColor = false,
+      allowFont = false,
       } = {},
     ) {
       let sizeStr = "";
@@ -489,6 +541,9 @@
       let srcUrl = "";
       let fitMode = "";
       let bgUrl = "";
+      let gotoAfterSec = null;
+      let colorHex = "";
+    let fontSpec = null;
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -556,6 +611,21 @@
           fitMode = val;
           return;
         }
+        if (kind === "gotoAfter") {
+          if (gotoAfterSec != null) throw formatError(tag, "GOTOAFTER указан более одного раза.");
+          gotoAfterSec = val;
+          return;
+        }
+        if (kind === "color") {
+          if (colorHex) throw formatError(tag, "COLOR указан более одного раза.");
+          colorHex = val;
+          return;
+        }
+      if (kind === "font") {
+        if (fontSpec) throw formatError(tag, "FONT указан более одного раза.");
+        fontSpec = val;
+        return;
+      }
       };
 
       for (const raw of tokens) {
@@ -581,6 +651,15 @@
         }
         if (isBgToken(v) && !allowBg) {
           throw formatError(tag, `Поле "${v}" (bg) не поддерживается для этого тега.`);
+        }
+        if (isColorToken(v) && !allowColor) {
+          throw formatError(tag, `Поле "${v}" (color) не поддерживается для этого тега.`);
+        }
+      if (isFontToken(v) && !allowFont) {
+        throw formatError(tag, `Поле "${v}" (font) не поддерживается для этого тега.`);
+      }
+        if (isGotoAfterToken(v) && !allowGotoAfter) {
+          throw formatError(tag, `Поле "${v}" (GOTOAFTER) не поддерживается для этого тега.`);
         }
         if (allowMargin && isMarginToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "MARGIN");
@@ -613,8 +692,12 @@
           setOnce("icon", name);
           if (sizeRaw !== "") {
             const n = parseIntNonNegative(sizeRaw, meta, "ICON size");
-            // Guard rails: keep it reasonable for buttons.
-            if (n < 8 || n > 48) throw formatError(tag, "ICON size должен быть в диапазоне 8..48 px.");
+            // Guard rails:
+            // - Buttons: keep it compact.
+            // - Images/icons (I): allow larger sizes for grid-like UIs.
+            const min = 8;
+            const max = tag === "I" ? 256 : 48;
+            if (n < min || n > max) throw formatError(tag, `ICON size должен быть в диапазоне ${min}..${max} px.`);
             setOnce("iconSize", n);
           }
           continue;
@@ -646,6 +729,21 @@
             throw formatError(tag, 'FIT должен быть "FIT" или "CROP" (или legacy "FIT:contain"/"FIT:cover").');
           }
           setOnce("fit", raw);
+          continue;
+        }
+        if (allowColor && isColorToken(v)) {
+          const c = parseColorHex(v, meta);
+          setOnce("color", c);
+          continue;
+        }
+      if (allowFont && isFontToken(v)) {
+        const spec = parseFontToken(v, meta);
+        setOnce("font", spec);
+        continue;
+      }
+        if (allowGotoAfter && isGotoAfterToken(v)) {
+          const sec = parseGotoAfterSeconds(v, meta);
+          setOnce("gotoAfter", sec);
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -684,6 +782,9 @@
         srcUrl,
         fitMode,
         bgUrl,
+        gotoAfterSec,
+        colorHex,
+      fontSpec,
       };
     }
 
@@ -691,7 +792,7 @@
       // P supports both forms:
       // - P\CAPTION[\...поля...]
       // - P\ID\CAPTION[\...поля...]  (ID must match [A-Za-z0-9_-]+)
-      // Additional fields are unordered; supported: P10 (padding), HINT.
+      // Additional fields are unordered; supported: P10 (padding), GOTOAFTER:<sec>, HINT.
       let id = "";
       let caption = "";
       const idRe = /^[A-Za-z0-9_-]+$/;
@@ -716,10 +817,12 @@
         allowCols: false,
         allowMargin: false,
         allowPadding: true,
+        allowGotoAfter: true,
       });
       const hint = rest.hint || "";
       const padding = rest.paddingPx ?? 0;
-      return { indent, node: { tag, id, caption, padding, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
+      const gotoAfterSec = rest.gotoAfterSec;
+      return { indent, node: { tag, id, caption, padding, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -756,6 +859,7 @@
         allowPadding: true,
         allowRadius: true,
         allowIcon: true,
+        allowColor: true,
       });
       if (!String(caption).trim() && !String(rest.iconName || "").trim()) {
         throw formatError("B", 'Нужен CAPTION или ICON:... (например "B\\Кнопка" или "B\\ICON:home").');
@@ -775,6 +879,7 @@
           radius: rest.radiusPx ?? 6,
           icon: rest.iconName || "",
           iconSize: rest.iconSizePx ?? null,
+          color: rest.colorHex || "",
           ...common,
           rawLineNo: lineNo,
         },
@@ -791,6 +896,8 @@
         allowHint: true,
         allowMargin: true,
         allowPadding: true,
+        allowColor: true,
+        allowFont: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -800,7 +907,16 @@
       // C ACTION is not meaningful; strict/permissive behavior is enforced in parseAction.
       return {
         indent,
-        node: { tag, id: "", padding: rest.paddingPx ?? 5, margin: rest.marginPx ?? 3, ...common, rawLineNo: lineNo },
+        node: {
+          tag,
+          id: "",
+          padding: rest.paddingPx ?? 5,
+          margin: rest.marginPx ?? 3,
+          color: rest.colorHex || "",
+          font: rest.fontSpec ? { ...rest.fontSpec } : null,
+          ...common,
+          rawLineNo: lineNo,
+        },
       };
     }
 
@@ -815,45 +931,93 @@
         allowSrc: false,
         allowFit: false,
         allowBg: true,
+        allowColor: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const hint = rest.hint;
       const bg = rest.bgUrl || "";
+      const bgColor = rest.colorHex || "";
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
-      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, bg, ...common, rawLineNo: lineNo } };
+      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, bg, bgColor, ...common, rawLineNo: lineNo } };
     }
 
     if (tag === "I") {
-      const rest = parseUnorderedFields(fields.slice(1), {
+      // I supports:
+      // - I\SRC:<url> ...
+      // - I\<iconName> ... (shorthand for built-in SVG icon)
+      // - I\SRC:<iconName> ... (if SRC value looks like a bare icon name)
+      let tokens = fields.slice(1);
+      const first = String(get(1) || "").trim();
+      if (
+        first &&
+        !isSrcToken(first) &&
+        !isIconToken(first) &&
+        !isSizeToken(first) &&
+        !isAlignToken(first) &&
+        !isMarginToken(first) &&
+        !isPaddingToken(first) &&
+        !isRadiusToken(first) &&
+        !isFitToken(first) &&
+        !isBgToken(first) &&
+        !isActionToken(first)
+      ) {
+        const nm = first.toLowerCase();
+        if (BUILTIN_BUTTON_ICONS.includes(nm)) {
+          tokens = [...tokens];
+          tokens[0] = `ICON:${nm}`;
+        }
+      }
+
+      const rest = parseUnorderedFields(tokens, {
         allowSize: true,
         allowAlign: true,
-        allowAction: false,
+        allowAction: true,
         allowHint: true,
         allowCols: false,
         allowMargin: true,
         allowPadding: false,
         allowRadius: true,
-        allowIcon: false,
+        allowIcon: true,
         allowSrc: true,
         allowFit: true,
         allowBg: false,
+        allowColor: true,
       });
-      const src = String(rest.srcUrl || "").trim();
-      if (!src) throw formatError("I", 'SRC обязателен (например "I\\SRC:src/yarmap.PNG").');
+      let src = String(rest.srcUrl || "").trim();
+      let icon = String(rest.iconName || "").trim().toLowerCase();
+      const iconSize = rest.iconSizePx ?? null;
+
+      // If SRC looks like a bare icon name, treat it as icon (for convenience).
+      if (src && !icon) {
+        const nm = src.toLowerCase();
+        const looksBare = /^[a-z0-9_-]+$/i.test(src) && !src.includes("/") && !src.includes(".") && !src.includes(":");
+        if (looksBare && BUILTIN_BUTTON_ICONS.includes(nm)) {
+          icon = nm;
+          src = "";
+        }
+      }
+
+      if (!src && !icon) {
+        throw formatError("I", 'Нужен SRC:<url> или имя встроенной иконки (например "I\\SRC:src/yarmap.PNG" или "I\\home").');
+      }
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
       const hint = rest.hint;
-      const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
+      const actionStr = rest.actionStr;
+      const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr, hint });
     return {
       indent,
       node: {
         tag,
           id: "",
           src,
+          icon,
+          iconSize,
           fit: rest.fitMode || "none",
           margin: rest.marginPx ?? 0,
           radius: rest.radiusPx ?? 0,
+          color: rest.colorHex || "",
           ...common,
         rawLineNo: lineNo,
       },
@@ -869,6 +1033,7 @@
         allowCols: true,
         allowMargin: true,
         allowPadding: true,
+        allowColor: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -882,6 +1047,7 @@
           colsSpec: rest.colsSpec || "",
           margin: rest.marginPx ?? 0,
           cellPadding: rest.paddingPx ?? 5,
+          color: rest.colorHex || "",
           ...common,
         rawLineNo: lineNo,
       },
@@ -1192,6 +1358,22 @@
     }
     for (const p of pages) validateTables(p);
 
+    // Validate P.GOTOAFTER (auto-navigation): it navigates to the *next* page in source order.
+    // If page is the last one, strict: error; permissive: ignore.
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i];
+      if (p?.tag !== "P") continue;
+      if (p.gotoAfterSec == null) continue;
+      const next = pages[i + 1] || null;
+      if (!next) {
+        const meta = { line: p.rawLineNo, col: 1, sourceName, lineText: lines[p.rawLineNo - 1] };
+        if (mode === "strict") {
+          throw new UxlParseError("GOTOAFTER у последней страницы не имеет цели (нет следующей страницы).", meta);
+        }
+        p.gotoAfterSec = null;
+      }
+    }
+
     // Collect edges (one per from->to)
     const edges = new Map(); // key "from=>to" -> {fromId,toId}
 
@@ -1215,6 +1397,20 @@
       for (const ch of node.children || []) collectEdges(ch);
     }
     for (const p of pages) collectEdges(p);
+
+    // Also include auto-navigation edges in the map (only if both pages have IDs).
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i];
+      const next = pages[i + 1] || null;
+      if (!p || p.tag !== "P" || p.gotoAfterSec == null) continue;
+      if (!next || next.tag !== "P") continue;
+      if (!p.id || !next.id) continue;
+      const fromKey = normalizeId(p.id);
+      const toKey = normalizeId(next.id);
+      if (!fromKey || !toKey) continue;
+      const key = `${fromKey}=>${toKey}`;
+      edges.set(key, { fromId: p.id, toId: next.id });
+    }
 
     // Validate GOTO targets
     for (const e of edges.values()) {
@@ -1274,6 +1470,24 @@
     return blocks;
   }
 
+  function splitMarkdownByUxlFences(mdText) {
+    // Returns ordered segments: {kind:"html", html} or {kind:"uxl", uxlText}
+    const text = String(mdText).replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+    const segs = [];
+    const re = /```UXL[^\n]*\n([\s\S]*?)```/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(text))) {
+      const before = text.slice(last, m.index);
+      if (before) segs.push({ kind: "html", html: before });
+      segs.push({ kind: "uxl", uxlText: m[1] });
+      last = m.index + m[0].length;
+    }
+    const tail = text.slice(last);
+    if (tail) segs.push({ kind: "html", html: tail });
+    return segs;
+  }
+
   function el(tag, attrs = {}, children = []) {
     const node = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
@@ -1290,29 +1504,33 @@
     return node;
   }
 
+  function renderRawHtml(html) {
+    const wrap = el("div", { class: "uxl-raw-html" });
+    // Intentionally treat as raw HTML, per request.
+    wrap.innerHTML = String(html ?? "");
+    return wrap;
+  }
+
   const BUILTIN_SVG_ICONS = Object.freeze({
-    // Source: IHAVA.svg (converted to inherit currentColor; kept original path transforms)
+    // Icon set source: Feather Icons (https://feathericons.com/) with minor adaptations:
+    // - converted to inherit `currentColor`
+    // - kept as inline SVG specs
+    // Note: `ai` icon has its own source below.
     ai: {
-      viewBox: "0 0 137.04 128.194",
-      mode: "fill",
-      paths: [
-        { d: "M25.0923 0C24.3575 0.754547 23.1565 1.23846 21.8123 1.23846L5.84302 1.23846C4.49878 1.23846 3.29773 0.758148 2.58081 0.00535583L0 2.4877C1.41589 3.96637 3.56677 4.82309 5.84302 4.82309L21.8123 4.82309C24.1064 4.82309 26.2572 3.96277 27.6731 2.47699L25.0923 0L25.0923 0Z", transform: "matrix(1 0 0 1 54.7747 55.8648)" },
-        {
-          d: "M1.88208 0C2.92163 0 3.76379 0.842407 3.76379 1.8819L3.76379 8.87195C3.76379 9.9115 2.92163 10.7538 1.88208 10.7538C0.842407 10.7538 0 9.9115 0 8.87195L0 1.8819C0 0.842407 0.842407 0 1.88208 0L1.88208 0ZM1.88208 3.58463C2.81396 3.58463 3.58459 2.82289 3.58459 1.8819L3.58459 8.87195C3.58459 7.93103 2.81396 7.16924 1.88208 7.16924C0.949951 7.16924 0.179199 7.93103 0.179199 8.87195L0.179199 1.8819C0.179199 2.82289 0.949951 3.58463 1.88208 3.58463L1.88208 3.58463Z",
-          transform: "matrix(1 0 0 1 73.9882 40.9735)",
-        },
-        {
-          d: "M1.88208 0C2.92151 0 3.76379 0.842407 3.76379 1.8819L3.76379 8.87195C3.76379 9.9115 2.92151 10.7538 1.88208 10.7538C0.842407 10.7538 0 9.9115 0 8.87195L0 1.8819C0 0.842407 0.842407 0 1.88208 0L1.88208 0ZM1.88208 3.58463C2.81396 3.58463 3.58459 2.82289 3.58459 1.8819L3.58459 8.87195C3.58459 7.93103 2.81396 7.16924 1.88208 7.16924C0.949951 7.16924 0.179199 7.93103 0.179199 8.87195L0.179199 1.8819C0.179199 2.82289 0.949951 3.58463 1.88208 3.58463L1.88208 3.58463Z",
-          transform: "matrix(1 0 0 1 59.6497 40.9735)",
-        },
-        {
-          d: "M77.2993 17.027L74.5052 19.8208C85.808 35.1257 84.5288 56.8051 70.667 70.6665C57.8584 83.475 38.3755 85.5408 23.4142 76.864C23.4469 76.6656 23.463 76.4616 23.463 76.2546C23.463 74.095 21.7123 72.3439 19.5525 72.3439C17.3928 72.3439 15.642 74.095 15.642 76.2546C15.642 78.4142 17.3928 80.1653 19.5525 80.1653C20.0282 80.1653 20.484 80.08 20.9055 79.9247C37.4316 89.8429 59.1853 87.6785 73.4319 73.4319C88.8236 58.0402 90.1125 33.8863 77.2993 17.027L77.2993 17.027ZM12.5989 12.5989C-2.79272 27.9905 -4.08179 52.1444 8.73157 69.0038L11.5255 66.2104C0.222778 50.905 1.50232 29.2258 15.3641 15.364C28.1725 2.55571 47.6554 0.489883 62.6168 9.16656C62.5839 9.3653 62.5681 9.56891 62.5681 9.77621C62.5681 11.9359 64.3185 13.6867 66.4781 13.6867C68.6383 13.6867 70.3888 11.9359 70.3888 9.77621C70.3888 7.6165 68.6383 5.86572 66.4781 5.86572C66.0026 5.86572 65.5472 5.95061 65.1252 6.10611C48.5992 -3.81197 26.8456 -1.64767 12.5989 12.5989L12.5989 12.5989Z",
-          transform: "matrix(1 0 0 1 25.5958 6.9194)",
-        },
-        {
-          d: "M50.1846 0C53.16 0 55.5613 2.40704 55.5613 5.37689L55.5613 10.7538L57.3538 10.7538C59.3252 10.7538 60.9387 12.3579 60.9387 14.3385L60.9387 25.0923C60.9387 27.0728 59.3252 28.6769 57.3538 28.6769L55.5613 28.6769L55.5613 34.0538C55.5613 37.0237 53.16 39.4308 50.1846 39.4308L10.7539 39.4308C7.77869 39.4308 5.37695 37.0237 5.37695 34.0538L5.37695 28.6769L3.58459 28.6769C1.61304 28.6769 0 27.0728 0 25.0923L0 14.3385C0 12.3579 1.61304 10.7538 3.58459 10.7538L5.37695 10.7538L5.37695 5.37689C5.37695 2.40704 7.77869 0 10.7539 0L50.1846 0L50.1846 0ZM50.1846 3.58461L10.7539 3.58461C9.76807 3.58461 8.96155 4.38757 8.96155 5.37689L8.96155 34.0538C8.96155 35.0432 9.76807 35.8462 10.7539 35.8462L50.1846 35.8462C51.1703 35.8462 51.9769 35.0432 51.9769 34.0538L51.9769 5.37689C51.9769 4.38757 51.1703 3.58461 50.1846 3.58461L50.1846 3.58461ZM5.37695 14.3385L3.58459 14.3385L3.58459 25.0923L5.37695 25.0923L5.37695 14.3385L5.37695 14.3385ZM57.3538 14.3385L55.5613 14.3385L55.5613 25.0923L57.3538 25.0923L57.3538 14.3385L57.3538 14.3385Z",
-          transform: "matrix(1 0 0 1 38.142 30.2193)",
-        },
+      // Source: ./ai.svg (24x24 stroke icon; converted to inherit currentColor)
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "rect", attrs: { x: "4", y: "4", width: "16", height: "16", rx: "2", ry: "2" } },
+        { tag: "line", attrs: { x1: "9", y1: "1", x2: "9", y2: "4" } },
+        { tag: "line", attrs: { x1: "15", y1: "1", x2: "15", y2: "4" } },
+        { tag: "line", attrs: { x1: "9", y1: "20", x2: "9", y2: "23" } },
+        { tag: "line", attrs: { x1: "15", y1: "20", x2: "15", y2: "23" } },
+        { tag: "line", attrs: { x1: "20", y1: "9", x2: "23", y2: "9" } },
+        { tag: "line", attrs: { x1: "20", y1: "14", x2: "23", y2: "14" } },
+        { tag: "line", attrs: { x1: "1", y1: "9", x2: "4", y2: "9" } },
+        { tag: "line", attrs: { x1: "1", y1: "14", x2: "4", y2: "14" } },
+        { tag: "polyline", attrs: { points: "6.7 9.28 6.7 13.87 10.53 9.28 10.53 13.87" } },
+        { tag: "polyline", attrs: { points: "13.5 9.28 13.5 13.87 17.33 9.28 17.33 13.87" } },
       ],
     },
     back: { viewBox: "0 0 24 24", d: ["M15 18l-6-6 6-6", "M9 12h12"] },
@@ -1383,6 +1601,10 @@
       ],
     },
     home: { viewBox: "0 0 24 24", d: ["M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"] },
+    loader: {
+      viewBox: "0 0 24 24",
+      els: [{ tag: "path", attrs: { d: "M21 12a9 9 0 1 1-6.219-8.56" } }],
+    },
     microphone: {
       viewBox: "0 0 24 24",
       d: [
@@ -1554,6 +1776,8 @@
         nodeEl = el("div", { class: "uxl-node uxl-F", "data-uxl-uid": node.uid });
         if (node.hint) nodeEl.title = node.hint;
         if (Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
+        const bgColor = String(node.bgColor || "").trim();
+        if (bgColor) nodeEl.style.backgroundColor = bgColor;
         const bg = String(node.bg || "").trim();
         if (bg) {
           // Allow relative URLs like "src/yarmap.PNG". Avoid breaking CSS string with quotes.
@@ -1583,21 +1807,33 @@
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;
       } else if (tag === "I") {
-        nodeEl = el("div", { class: "uxl-node uxl-I", "data-uxl-uid": node.uid });
-        const fit = String(node.fit || "").trim().toLowerCase();
-        if (fit === "contain" || fit === "cover") nodeEl.style.setProperty("--uxl-img-fit", fit);
-        if (Number.isFinite(node.radius) && node.radius > 0) nodeEl.style.borderRadius = `${node.radius}px`;
-        const img = document.createElement("img");
-        img.className = "uxl-I__img";
-        img.alt = "";
-        img.decoding = "async";
-        img.loading = "eager";
-        img.src = String(node.src || "");
-        const broken = el("div", { class: "uxl-I__broken", text: "image not found" });
-        img.addEventListener("error", () => {
-          nodeEl.classList.add("uxl-I--broken");
+        const hasAction = !!(node.action && node.action.type === "GOTO");
+        nodeEl = el(hasAction ? "button" : "div", {
+          class: hasAction ? "uxl-node uxl-I uxl-I--action" : "uxl-node uxl-I",
+          ...(hasAction ? { type: "button" } : {}),
+          "data-uxl-uid": node.uid,
         });
-        nodeEl.append(img, broken);
+        const iconName = String(node.icon || "").trim();
+        const fit = String(node.fit || "").trim().toLowerCase();
+        if (!iconName && (fit === "contain" || fit === "cover")) nodeEl.style.setProperty("--uxl-img-fit", fit);
+        if (Number.isFinite(node.radius) && node.radius > 0) nodeEl.style.borderRadius = `${node.radius}px`;
+        if (iconName) {
+          const ico = svgIcon(iconName, { className: "uxl-I__icon" });
+          if (ico) nodeEl.append(ico);
+          if (Number.isFinite(node.iconSize)) nodeEl.style.setProperty("--uxl-icon-size", `${node.iconSize}px`);
+        } else {
+          const img = document.createElement("img");
+          img.className = "uxl-I__img";
+          img.alt = "";
+          img.decoding = "async";
+          img.loading = "eager";
+          img.src = String(node.src || "");
+          const broken = el("div", { class: "uxl-I__broken", text: "image not found" });
+          img.addEventListener("error", () => {
+            nodeEl.classList.add("uxl-I--broken");
+          });
+          nodeEl.append(img, broken);
+        }
       } else if (tag === "T") {
         nodeEl = el("div", { class: "uxl-node uxl-T", "data-uxl-uid": node.uid });
         nodeEl.style.setProperty("--uxl-table-cell-pad", `${Number.isFinite(node.cellPadding) ? node.cellPadding : 0}px`);
@@ -1615,7 +1851,9 @@
           thNode.cells.forEach((cell, idx) => {
             const colAlign = (node._tcCols?.[idx]?.align || "").toUpperCase();
             const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : "center";
-            tr.append(el("th", { style: `text-align:${align};`, text: cell }));
+            const c = String(node.color || "").trim();
+            const style = `text-align:${align};${c ? `color:${c};` : ""}`;
+            tr.append(el("th", { style, text: cell }));
           });
           thead.append(tr);
         }
@@ -1625,7 +1863,9 @@
           td.cells.forEach((cell, idx) => {
             const colAlign = (node._tcCols?.[idx]?.align || "").toUpperCase();
             const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : "center";
-            tr.append(el("td", { style: `text-align:${align};`, text: cell }));
+            const c = String(node.color || "").trim();
+            const style = `text-align:${align};${c ? `color:${c};` : ""}`;
+            tr.append(el("td", { style, text: cell }));
           });
           tbody.append(tr);
         }
@@ -1634,6 +1874,16 @@
         nodeEl.append(table);
       } else {
         nodeEl = el("div", { class: "uxl-node", "data-uxl-uid": node.uid });
+      }
+
+      // Element base color (affects text and SVG icons via currentColor)
+      const nodeColor = String(node.color || "").trim();
+      if (nodeColor) nodeEl.style.color = nodeColor;
+
+      if (tag === "C" && node.font) {
+        if (Number.isFinite(node.font.sizePx)) nodeEl.style.fontSize = `${node.font.sizePx}px`;
+        if (node.font.bold) nodeEl.style.fontWeight = "700";
+        if (node.font.italic) nodeEl.style.fontStyle = "italic";
       }
 
       if (node.hint) nodeEl.title = node.hint;
@@ -1663,6 +1913,15 @@
       const nodeEl = domByUid.get(node.uid);
       if (!nodeEl) return { w: 0, h: 0 };
       if (node.tag === "I") {
+        const svg = nodeEl.querySelector("svg.uxl-I__icon");
+        if (svg) {
+          const r = svg.getBoundingClientRect();
+          const w = Math.ceil(r.width);
+          const h = Math.ceil(r.height);
+          if (w > 0 && h > 0) return { w, h };
+          const s = Number.isFinite(node.iconSize) ? node.iconSize : 24;
+          return { w: s, h: s };
+        }
         const img = nodeEl.querySelector("img");
         const broken = nodeEl.classList.contains("uxl-I--broken");
         if (img && img.naturalWidth > 0 && img.naturalHeight > 0) return { w: img.naturalWidth, h: img.naturalHeight };
@@ -2488,15 +2747,31 @@
     window.addEventListener("resize", () => requestAnimationFrame(() => applyResponsiveScale()));
     if (window.visualViewport) window.visualViewport.addEventListener("resize", () => requestAnimationFrame(() => applyResponsiveScale()));
 
+    function scrollToPageUid(pageUid) {
+      const root = page.closest(".uxl-root") || document;
+      const pageEl = root.querySelector(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
+      const headEl = pageEl?.querySelector(".uxl-page__head") || pageEl;
+      if (!headEl) return false;
+      headEl.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
+      if (pageEl) {
+        pageEl.classList.remove("uxl-page--goto");
+        void pageEl.offsetWidth;
+        pageEl.classList.add("uxl-page--goto");
+        window.setTimeout(() => pageEl.classList.remove("uxl-page--goto"), 2400);
+      }
+      return true;
+    }
+
     // Wire button clicks (GOTO) to navigate between pages (scroll the browser page).
     function wireGotoClicks() {
-      const buttons = Array.from(canvas.querySelectorAll('button.uxl-B[data-uxl-uid]'));
-      for (const btn of buttons) {
-        const uid = btn.getAttribute("data-uxl-uid");
+      const clickable = Array.from(canvas.querySelectorAll('[data-uxl-uid]'));
+      for (const elx of clickable) {
+        const uid = elx.getAttribute("data-uxl-uid");
         if (!uid) continue;
         const node = ast.nodeByUid?.get(uid) || null;
         if (!node || !node.action || node.action.type !== "GOTO") continue;
-        btn.addEventListener("click", (ev) => {
+        elx.style.cursor = "pointer";
+        elx.addEventListener("click", (ev) => {
           ev.preventDefault();
           const targetId = String(node.action.target || "").trim();
           const targetKey = normalizeId(targetId);
@@ -2506,22 +2781,7 @@
             alert(`UXL: страница для GOTO не найдена: "${targetId}"`);
             return;
           }
-          const pageEl = document.querySelector(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
-          const headEl = pageEl?.querySelector(".uxl-page__head") || pageEl;
-          if (!headEl) {
-            alert(`UXL: не удалось перейти к странице "${targetId}" (DOM не найден).`);
-            return;
-          }
-          headEl.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
-
-          // Highlight target page: title + canvas border animate red like hints.
-          if (pageEl) {
-            pageEl.classList.remove("uxl-page--goto");
-            // force reflow to restart animation
-            void pageEl.offsetWidth;
-            pageEl.classList.add("uxl-page--goto");
-            window.setTimeout(() => pageEl.classList.remove("uxl-page--goto"), 2400);
-          }
+          if (!scrollToPageUid(pageUid)) alert(`UXL: не удалось перейти к странице "${targetId}" (DOM не найден).`);
         });
       }
     }
@@ -2613,35 +2873,73 @@
       overlay.setAttribute("height", String(Math.round(bodyRect.height)));
 
       const hintWithLines = hintItems.filter((n) => n.uid !== pageNode.uid);
+      // Build segments first so we can assign "lanes" (different midX) to reduce overlaps.
+      const segs = [];
       for (let idx = 0; idx < hintWithLines.length; idx++) {
         const n = hintWithLines[idx];
-        // Page hint is listed, but it must not have a callout line.
         const li = list.querySelector(`li[data-uxl-uid="${CSS.escape(n.uid)}"]`);
-        const target = n.uid === pageNode.uid ? canvas : domByUid.get(n.uid);
+        const target = domByUid.get(n.uid);
         if (!li || !target) continue;
         const dot = li.querySelector('[data-uxl-dot="1"]');
         if (!dot) continue;
-        const liRect = li.getBoundingClientRect();
         const dotRect = dot.getBoundingClientRect();
         const tRect = target.getBoundingClientRect();
 
         const start = { x: dotRect.left + dotRect.width / 2 - bodyRect.left, y: dotRect.top + dotRect.height / 2 - bodyRect.top };
         // End point should land on the edge facing the hints list (right edge).
-        // Add deterministic vertical spread so multiple callouts don't collapse into a single horizontal line.
+        // Keep a deterministic vertical spread so multiple callouts don't collapse into a single horizontal line.
         const baseEnd = { x: tRect.right - bodyRect.left, y: tRect.top + tRect.height / 2 - bodyRect.top };
         const spread = (idx - (hintWithLines.length - 1) / 2) * 8;
         const end = { x: baseEnd.x, y: baseEnd.y + spread };
 
-        // Route is orthogonal (as before).
-        const midX = Math.round((start.x + end.x) / 2);
+        const y1 = Math.min(start.y, end.y);
+        const y2 = Math.max(start.y, end.y);
+        segs.push({ start, end, y1, y2 });
+      }
+
+      // Assign lane index to reduce overlapping vertical segments.
+      // Each lane corresponds to a different midX (channel) in the corridor between canvas and hints list.
+      const laneGap = 14; // px
+      const lanePad = 10; // y-padding for overlap checks
+      const lanes = []; // laneIdx -> [{y1,y2}]
+      function rangesOverlap(a1, a2, b1, b2) {
+        return a1 <= b2 + lanePad && a2 >= b1 - lanePad;
+      }
+      function pickLane(y1, y2) {
+        for (let li = 0; li < lanes.length; li++) {
+          const used = lanes[li] || [];
+          let ok = true;
+          for (const r of used) {
+            if (rangesOverlap(y1, y2, r.y1, r.y2)) {
+              ok = false;
+              break;
+            }
+          }
+          if (ok) return li;
+        }
+        lanes.push([]);
+        return lanes.length - 1;
+      }
+
+      for (const s of segs) {
+        const lane = pickLane(s.y1, s.y2);
+        lanes[lane].push({ y1: s.y1, y2: s.y2 });
+
+        // Place midX near the canvas edge and fan out to the right by lane index.
+        const minX = Math.min(s.start.x, s.end.x);
+        const maxX = Math.max(s.start.x, s.end.x);
+        let midX = Math.round((s.end.x + 18) + lane * laneGap);
+        // Clamp to stay within the corridor between target and hint dot.
+        midX = Math.max(Math.round(minX + 12), Math.min(Math.round(maxX - 12), midX));
+
         const pts = [
-          { x: Math.round(start.x), y: Math.round(start.y) },
-          { x: midX, y: Math.round(start.y) },
-          { x: midX, y: Math.round(end.y) },
-          { x: Math.round(end.x), y: Math.round(end.y) },
+          { x: Math.round(s.start.x), y: Math.round(s.start.y) },
+          { x: midX, y: Math.round(s.start.y) },
+          { x: midX, y: Math.round(s.end.y) },
+          { x: Math.round(s.end.x), y: Math.round(s.end.y) },
         ];
 
-        drawOrthogonalRounded(overlay, start, end, { endCircle: true, circleRadius: 4, arrowMarkerId: null, points: pts });
+        drawOrthogonalRounded(overlay, s.start, s.end, { endCircle: true, circleRadius: 4, arrowMarkerId: null, points: pts });
       }
     }
 
@@ -2782,6 +3080,7 @@
     let currentUid = ast.pages[0]?.uid || null;
     let lastWinW = win.w;
     let lastWinH = win.h;
+    let gotoAfterTimerId = null;
 
     function refreshFullscreenWindowIfNeeded() {
       if (view !== "fullscreen") return;
@@ -2803,14 +3102,33 @@
       canvas.replaceChildren();
       layoutTree(canvas, pageNode, win);
 
+      // Auto navigation: P\...\GOTOAFTER:<seconds> (prototype-only)
+      if (gotoAfterTimerId != null) {
+        window.clearTimeout(gotoAfterTimerId);
+        gotoAfterTimerId = null;
+      }
+      const sec = pageNode.gotoAfterSec;
+      if (sec != null && Number.isFinite(sec) && sec >= 0) {
+        const idx = ast.pages.findIndex((p) => p.uid === pageNode.uid);
+        const next = idx >= 0 ? ast.pages[idx + 1] : null;
+        if (next) {
+          gotoAfterTimerId = window.setTimeout(() => {
+            gotoAfterTimerId = null;
+            currentUid = next.uid;
+            renderCurrent();
+          }, Math.round(sec * 1000));
+        }
+      }
+
       // wire goto: switch pages inside prototype
-      const buttons = Array.from(canvas.querySelectorAll('button.uxl-B[data-uxl-uid]'));
-      for (const btn of buttons) {
-        const uid = btn.getAttribute("data-uxl-uid");
+      const clickable = Array.from(canvas.querySelectorAll('[data-uxl-uid]'));
+      for (const elx of clickable) {
+        const uid = elx.getAttribute("data-uxl-uid");
         if (!uid) continue;
         const node = ast.nodeByUid?.get(uid) || null;
         if (!node || !node.action || node.action.type !== "GOTO") continue;
-        btn.addEventListener("click", (ev) => {
+        elx.style.cursor = "pointer";
+        elx.addEventListener("click", (ev) => {
           ev.preventDefault();
           const targetId = String(node.action.target || "").trim();
           const targetKey = normalizeId(targetId);
@@ -2883,7 +3201,7 @@
     };
   }
 
-  function renderAst(ast, { uxlText = "", mode = "permissive" } = {}) {
+  function renderAst(ast, { uxlText = "", mode = "permissive", pageInterleaves = null } = {}) {
     const root = el("div", { class: "uxl-root" });
     root.append(el("div", { class: "uxl-map__title", text: "Превью прототипа" }));
     const toolbar = el("div", { class: "uxl-toolbar" });
@@ -2896,7 +3214,22 @@
     root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });
-    for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p));
+    const inter = Array.isArray(pageInterleaves) ? pageInterleaves : null;
+    if (!inter || inter.length === 0) {
+      for (const p of ast.pages) pagesWrap.append(renderPageSection(ast, p));
+    } else {
+      const byIndex = new Map(); // idx -> [html]
+      for (const it of inter) {
+        const idx = Number.isFinite(it?.index) ? it.index : null;
+        if (idx == null) continue;
+        if (!byIndex.has(idx)) byIndex.set(idx, []);
+        byIndex.get(idx).push(String(it.html ?? ""));
+      }
+      for (let i = 0; i <= ast.pages.length; i++) {
+        for (const html of byIndex.get(i) || []) pagesWrap.append(renderRawHtml(html));
+        if (i < ast.pages.length) pagesWrap.append(renderPageSection(ast, ast.pages[i]));
+      }
+    }
     root.append(pagesWrap);
 
     const footer = el("div", { class: "uxl-footer" });
@@ -2904,6 +3237,76 @@
     footer.append(ver);
     root.append(footer);
     return root;
+  }
+
+  function splitInlineHtmlFromUxlText(uxlText) {
+    // Allows interleaving raw HTML lines inside a UXL block *for main page only*.
+    // Those HTML lines are removed from parsing (replaced with comments), but we keep them to render
+    // before/between/after pages based on line numbers.
+    const lines = String(uxlText).replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
+    const masked = [...lines];
+    const htmlSegs = []; // {startLineNo,endLineNo,html}
+
+    const TAG_RE = /^\s*(P|F|I|B|C|T|TH|TD)(\\|$)/i;
+    const WINDOW_RE = /^\s*\d+\s*x\s*\d+\s*([CS]\s*)?([CS]\s*)?$/i;
+    const VERSION_RE = /^\s*UXL\s*:\s*/i;
+
+    let cur = null; // {start,end,parts:[]}
+    const flush = () => {
+      if (!cur) return;
+      htmlSegs.push({ startLineNo: cur.start, endLineNo: cur.end, html: cur.parts.join("\n") });
+      cur = null;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+      const lineNo = i + 1;
+      const trimmed = raw.trim();
+      const isBlank = !trimmed;
+      const afterIndent = raw.replace(/^\s+/, "");
+      const isComment = afterIndent.startsWith(";");
+      const isTag = TAG_RE.test(raw);
+      const isWindow = WINDOW_RE.test(raw);
+      const isVersion = VERSION_RE.test(raw);
+      const isUxl = isBlank || isComment || isTag || isWindow || isVersion;
+
+      if (isUxl) {
+        flush();
+        continue;
+      }
+
+      // Treat as raw HTML line.
+      masked[i] = `${raw.match(/^\s*/)?.[0] || ""};__HTML__`;
+      if (!cur) cur = { start: lineNo, end: lineNo, parts: [raw] };
+      else {
+        cur.end = lineNo;
+        cur.parts.push(raw);
+      }
+    }
+    flush();
+
+    return { maskedUxlText: masked.join("\n"), htmlSegs };
+  }
+
+  function renderUxlTextMain(uxlText, opts = {}) {
+    // Main page renderer: supports raw HTML lines inside the UXL block.
+    // Prototype views (1:1 / fullscreen) must NOT be affected => we pass maskedUxlText into toolbar actions.
+    try {
+      const { maskedUxlText, htmlSegs } = splitInlineHtmlFromUxlText(uxlText);
+      const ast = parseUxl(maskedUxlText, opts);
+
+      // Place HTML segments before/between/after pages based on original line numbers.
+      const interleaves = [];
+      for (const seg of htmlSegs) {
+        const idx = ast.pages.findIndex((p) => (p?.rawLineNo || 0) > seg.startLineNo);
+        interleaves.push({ index: idx === -1 ? ast.pages.length : idx, html: seg.html });
+      }
+      return renderAst(ast, { uxlText: maskedUxlText, mode: opts.mode || "permissive", pageInterleaves: interleaves });
+    } catch (e) {
+      if (e instanceof UxlParseError) return renderError(e);
+      const err = new UxlParseError(e?.message || String(e), { sourceName: opts.sourceName || "UXL" });
+      return renderError(err);
+    }
   }
 
   function renderUxlText(uxlText, opts = {}) {
@@ -2926,9 +3329,19 @@
         node.replaceWith(renderUxlText(raw, { mode, sourceName: "UXL" }));
         continue;
       }
+      const segs = splitMarkdownByUxlFences(raw);
       const wrapper = el("div");
-      for (const [idx, b] of blocks.entries()) {
-        wrapper.append(renderUxlText(b, { mode, sourceName: `UXL block ${idx + 1}` }));
+      let uxlIdx = 0;
+      for (const s of segs) {
+        if (s.kind === "html") {
+          // Render any text around UXL fences as raw HTML (main page only).
+          wrapper.append(renderRawHtml(s.html));
+          continue;
+        }
+        if (s.kind === "uxl") {
+          uxlIdx += 1;
+          wrapper.append(renderUxlTextMain(s.uxlText, { mode, sourceName: `UXL block ${uxlIdx}` }));
+        }
       }
       node.replaceWith(wrapper);
     }
@@ -2944,6 +3357,18 @@
     extractUxlBlocksFromMarkdown,
     openPrototypeForText,
     renderPrototypeFromStorageKeyOrLast,
+    // Built-in icons (kept in sync with renderer; useful for external icon galleries like icons.html)
+    getBuiltinIconNames: () => Object.keys(BUILTIN_SVG_ICONS || {}).map((s) => String(s)),
+    createBuiltinIconSvg: (name, { className = "", title = "", size = null } = {}) => {
+      const svg = svgIcon(name, { className, title });
+      if (!svg) return null;
+      const s = Number.isFinite(size) ? size : null;
+      if (s != null) {
+        svg.style.width = `${s}px`;
+        svg.style.height = `${s}px`;
+      }
+      return svg;
+    },
   };
 })();
 

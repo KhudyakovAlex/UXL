@@ -332,14 +332,27 @@
   padding-left: 0;
   color: var(--uxl-hint);
   list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .uxl-hints__item {
-  margin: 4px 0;
+  margin: 0;
   line-height: 1.3;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  white-space: normal;
+}
+
+.uxl-hints__item--page {
+  margin-bottom: 14px; /* extra gap between page hint and element hints */
+}
+
+.uxl-hints__item--page .uxl-hint-text {
+  color: #000000;
 }
 
 .uxl-hint-dot {
@@ -397,6 +410,12 @@
   align-items: center;
   justify-content: center;
   background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.uxl-I--action {
+  cursor: pointer;
 }
 
 .uxl-I__img {
@@ -405,6 +424,12 @@
   display: block;
   object-fit: var(--uxl-img-fit, none);
   object-position: center;
+}
+
+.uxl-I__icon {
+  width: var(--uxl-icon-size, 24px);
+  height: var(--uxl-icon-size, 24px);
+  flex: 0 0 auto;
 }
 
 .uxl-I__broken {

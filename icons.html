@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UXL icons</title>
+    <link rel="stylesheet" href="./uxl.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: #f3f3f3;
+        color: #222;
+      }
+      .wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      h1 {
+        margin: 6px 0 14px;
+        font-size: 18px;
+        font-weight: 650;
+      }
+      .meta {
+        margin: 0 0 14px;
+        color: #666;
+        font-size: 12px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 84px;
+      }
+      .ico {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 42px;
+        color: #111;
+      }
+      .name {
+        font-size: 12px;
+        color: #333;
+        word-break: break-word;
+      }
+      .copy {
+        font-size: 11px;
+        color: #666;
+        user-select: none;
+      }
+      .card button {
+        all: unset;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>UXL: встроенные пиктограммы</h1>
+      <div class="meta" id="meta"></div>
+      <div class="meta">Источник набора: <a href="https://feathericons.com/" target="_blank" rel="noreferrer">Feather Icons</a>.</div>
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <script src="./uxl.js"></script>
+    <script>
+      function run() {
+        const meta = document.getElementById("meta");
+        const grid = document.getElementById("grid");
+        try {
+          const UXL = window.UXL;
+          if (!UXL || typeof UXL.getBuiltinIconNames !== "function") {
+            meta.textContent = 'UXL не загружен или нет getBuiltinIconNames(). Проверьте, что "uxl.js" доступен рядом с "icons.html".';
+            return;
+          }
+          const rawNames = UXL.getBuiltinIconNames();
+          const names = (Array.isArray(rawNames) ? rawNames : []).map(String).slice().sort();
+          if (!names.length) {
+            meta.textContent = "Иконки не найдены.";
+            return;
+          }
+
+          meta.textContent = `Всего: ${names.length}. Renderer: ${UXL.VERSION || "?"}.`;
+
+          for (let i = 0; i < names.length; i++) {
+            const name = names[i];
+            const card = document.createElement("div");
+            card.className = "card";
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.title = `Скопировать: ${name}`;
+
+            const icoWrap = document.createElement("div");
+            icoWrap.className = "ico";
+            if (typeof UXL.createBuiltinIconSvg === "function") {
+              const svg = UXL.createBuiltinIconSvg(name, { size: 24 });
+              if (svg) icoWrap.appendChild(svg);
+            }
+            btn.appendChild(icoWrap);
+
+            btn.addEventListener("click", () => {
+              const text = String(name);
+              if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+                navigator.clipboard
+                  .writeText(text)
+                  .then(() => {
+                    btn.title = `Скопировано: ${name}`;
+                    setTimeout(() => (btn.title = `Скопировать: ${name}`), 1000);
+                  })
+                  .catch(() => {});
+              }
+            });
+
+            const nm = document.createElement("div");
+            nm.className = "name";
+            nm.textContent = name;
+
+            const hint = document.createElement("div");
+            hint.className = "copy";
+            hint.textContent = `I\\${name}   /   ICON:${name}`;
+
+            card.appendChild(btn);
+            card.appendChild(nm);
+            card.appendChild(hint);
+            grid.appendChild(card);
+          }
+        } catch (e) {
+          meta.textContent = `Ошибка: ${e && e.message ? e.message : String(e)}`;
+        }
+      }
+
+      if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", run);
+      else run();
+    </script>
+  </body>
+</html>
+
+
