@@ -172,12 +172,18 @@
     },
     "srcTok": {
       "patterns": [
-        { "name": "string.other.link.uxl", "match": "\\bSRC:[^\\\\\\s]+" }
+        {
+          "name": "string.other.link.uxl",
+          "match": "\\bSRC:(?:\"(?:\\\\.|[^\"\\\\])*\"|[^\\\\\\s]+)"
+        }
       ]
     },
     "bgTok": {
       "patterns": [
-        { "name": "string.other.link.uxl", "match": "\\bBG:[^\\\\\\s]+" }
+        {
+          "name": "string.other.link.uxl",
+          "match": "\\bBG:(?:\"(?:\\\\.|[^\"\\\\])*\"|[^\\\\\\s]+)"
+        }
       ]
     },
     "colsTok": {

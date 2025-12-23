@@ -321,11 +321,14 @@
             example: "P\\users\\Пользователи\\GOTOAFTER:3\\IN:M12\\IN:LT\\IN:V\\Подсказка страницы",
           };
         case "F":
-          return { format: "F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/IN:H|IN:V/#RRGGBB/BG:<url>/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\IN:M12\\IN:H\\#f0f0f0\\Контейнер" };
+          return {
+            format: 'F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/IN:H|IN:V/#RRGGBB/BG:"<url>"/HINT...] (поля в любом порядке)',
+            example: 'F\\100%x\\T\\IN:M12\\IN:H\\BG:"src/yarmap.PNG"\\#f0f0f0\\Контейнер',
+          };
         case "I":
           return {
             format:
-              'I\\SRC:<url>|<iconName>\\[SIZE/ALIGN/FIT|CROP/ICON:NAME[:SIZE]/M10/R6/HINT...] (поля в любом порядке; без PADDING). Если SRC — это имя встроенной иконки, рисуется SVG-иконка.',
+              'I\\SRC:"<url>"|<iconName>\\[SIZE/ALIGN/FIT|CROP/ICON:NAME[:SIZE]/M10/R6/HINT...] (поля в любом порядке; без PADDING). Если SRC — это имя встроенной иконки, рисуется SVG-иконка.',
             example: "I\\home\\24x24\\OUT:LT\\Подсказка иконки",
           };
         case "B":
@@ -640,6 +643,24 @@
       let inFlow = "";
       let textAlignStr = "";
 
+      const parsePrefixedUrl = (rawToken, prefix, kindForMsg) => {
+        const raw = String(rawToken || "").trim();
+        const rest = String(raw.slice(prefix.length)).trim();
+        if (!rest) {
+          throw formatError(tag, `${kindForMsg} должен быть вида "${prefix}\\"...\\"" (URL не может быть пустым).`);
+        }
+        if (rest.startsWith('"')) {
+          const url = unescapeQuotedField(rest, meta);
+          if (!url) throw formatError(tag, `${kindForMsg} должен быть вида "${prefix}\\"...\\"" (URL не может быть пустым).`);
+          return url;
+        }
+        if (mode === "strict") {
+          throw formatError(tag, `${kindForMsg} в strict-режиме должен быть в кавычках: "${prefix}\\"...\\"" (например ${prefix}"src/yarmap.PNG").`);
+        }
+        // permissive: allow legacy unquoted form
+        return rest;
+      };
+
       const setOnce = (kind, val) => {
         if (kind === "size") {
           if (sizeStr) throw formatError(tag, "SIZE указан более одного раза.");
@@ -803,14 +824,12 @@
           continue;
         }
         if (allowBg && isBgToken(v)) {
-          const url = String(v.slice("BG:".length)).trim();
-          if (!url) throw formatError(tag, `BG должен быть вида "BG:https://..." (URL не может быть пустым).`);
+          const url = parsePrefixedUrl(v, "BG:", "BG");
           setOnce("bg", url);
           continue;
         }
         if (allowSrc && isSrcToken(v)) {
-          const url = String(v.slice("SRC:".length)).trim();
-          if (!url) throw formatError(tag, `SRC должен быть вида "SRC:src/yarmap.PNG" (URL не может быть пустым).`);
+          const url = parsePrefixedUrl(v, "SRC:", "SRC");
           setOnce("src", url);
           continue;
         }
@@ -1187,7 +1206,7 @@
 
     if (tag === "I") {
       // I supports:
-      // - I\SRC:<url> ...
+      // - I\SRC:"<url>" ...   (strict; permissive also accepts legacy SRC:<url>)
       // - I\<iconName> ... (shorthand for built-in SVG icon)
       // - I\SRC:<iconName> ... (if SRC value looks like a bare icon name)
       let tokens = fields.slice(1);
@@ -1243,7 +1262,7 @@
       }
 
       if (!src && !icon) {
-        throw formatError("I", 'Нужен SRC:<url> или имя встроенной иконки (например "I\\SRC:src/yarmap.PNG" или "I\\home").');
+        throw formatError("I", 'Нужен SRC:"<url>" или имя встроенной иконки (например "I\\SRC:\\"src/yarmap.PNG\\"" или "I\\home").');
       }
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
