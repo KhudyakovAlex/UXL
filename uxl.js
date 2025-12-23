@@ -330,18 +330,18 @@
           };
         case "B":
           return {
-            format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/OUT:<ALIGN>[:M10]/IN:M10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\ICON:search:18\\100x\\OUT:RB:M6\\IN:M8\\R8\\GOTO:users\\Поиск",
+            format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/OUT:<ALIGN>[:M10]/IN:M10/IN:L|IN:C|IN:R/R6/HINT...] (поля в любом порядке)",
+            example: "B\\ICON:search:18\\100x\\OUT:RB:M6\\IN:M8\\IN:L\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return {
-            format: "C\\CAPTION\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
-            example: "C\\Текст\\x20\\OUT:LT:M4\\IN:M6\\FONT:24:BI\\Подсказка",
+            format: "C\\CAPTION\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/IN:L|IN:C|IN:R/FONT:24[:BI]/HINT...] (поля в любом порядке)",
+            example: "C\\Текст\\x20\\OUT:LT:M4\\IN:M6\\IN:C\\FONT:24:BI\\Подсказка",
           };
         case "T":
           return {
-            format: "T\\COLS:...\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (поля в любом порядке; IN:M10 задаёт padding ячеек TH/TD)",
-            example: "T\\COLS:20R,80L\\100%x100%\\OUT:T:M10\\IN:M6\\Таблица",
+            format: "T\\COLS:...\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/IN:L|IN:C|IN:R/HINT...] (поля в любом порядке; IN:M10 задаёт padding ячеек TH/TD)",
+            example: "T\\COLS:20R,80L\\100%x100%\\OUT:T:M10\\IN:M6\\IN:L\\Таблица",
           };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
@@ -627,6 +627,7 @@
       let colorHex = "";
     let fontSpec = null;
       let inFlow = "";
+      let textAlignStr = "";
 
       const setOnce = (kind, val) => {
         if (kind === "size") {
@@ -647,6 +648,11 @@
         if (kind === "inFlow") {
           if (inFlow) throw formatError(tag, "IN:FLOW (H/V) указан более одного раза.");
           inFlow = val;
+          return;
+        }
+        if (kind === "textAlign") {
+          if (textAlignStr) throw formatError(tag, "IN:L/C/R указан более одного раза.");
+          textAlignStr = val;
           return;
         }
         if (kind === "action") {
@@ -844,7 +850,21 @@
         const inTok = parseInToken(v);
         if (inTok) {
           if (!allowInAlign) throw formatError(tag, `Поле "${v}" (IN) не поддерживается для этого тега.`);
-          if (inTok.align) setOnce("inAlign", inTok.align);
+          if (inTok.align) {
+            const a = String(inTok.align || "").trim().toUpperCase();
+            if (tag === "P" || tag === "F") {
+              setOnce("inAlign", a);
+            } else if (tag === "B" || tag === "C" || tag === "T") {
+              // On non-containers, IN:<ALIGN> is repurposed for content/text alignment.
+              // Supported: horizontal only (L/C/R). Vertical anchors (T/B/M) are not applicable here.
+              if (a !== "L" && a !== "C" && a !== "R") {
+                throw formatError(tag, `Поле "${v}" (IN align) для этого тега допускает только L/C/R (выравнивание контента внутри).`);
+              }
+              setOnce("textAlign", a);
+            } else {
+              throw formatError(tag, `Поле "${v}" (IN align) не поддерживается для этого тега.`);
+            }
+          }
           if (inTok.paddingPx != null) setOnce("padding", inTok.paddingPx);
           if (inTok.flow) {
             // Flow makes sense only for containers.
@@ -883,6 +903,7 @@
         alignStr,
         inAlignStr,
         inFlow,
+        textAlignStr,
         actionStr,
         hint,
         colsSpec,
@@ -993,6 +1014,7 @@
           radius: rest.radiusPx ?? 6,
           icon: rest.iconName || "",
           iconSize: rest.iconSizePx ?? null,
+          textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           ...common,
           rawLineNo: lineNo,
@@ -1026,6 +1048,7 @@
           id: "",
           padding: rest.paddingPx ?? 5,
           margin: rest.marginPx ?? 3,
+          textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           font: rest.fontSpec ? { ...rest.fontSpec } : null,
           ...common,
@@ -1164,6 +1187,7 @@
           colsSpec: rest.colsSpec || "",
           margin: rest.marginPx ?? 0,
           cellPadding: rest.paddingPx ?? 5,
+          textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           ...common,
         rawLineNo: lineNo,
@@ -1910,9 +1934,26 @@
         return nodeEl;
       }
 
-      if (tag === "C") nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
+      if (tag === "C") {
+        nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
+        const a = String(node.textAlign || "").trim().toUpperCase();
+        if (a === "L") nodeEl.style.textAlign = "left";
+        else if (a === "C") nodeEl.style.textAlign = "center";
+        else if (a === "R") nodeEl.style.textAlign = "right";
+      }
       else if (tag === "B") {
         nodeEl = el("button", { class: "uxl-node uxl-B", type: "button", "data-uxl-uid": node.uid });
+        const a = String(node.textAlign || "").trim().toUpperCase();
+        if (a === "L") {
+          nodeEl.style.justifyContent = "flex-start";
+          nodeEl.style.textAlign = "left";
+        } else if (a === "C") {
+          nodeEl.style.justifyContent = "center";
+          nodeEl.style.textAlign = "center";
+        } else if (a === "R") {
+          nodeEl.style.justifyContent = "flex-end";
+          nodeEl.style.textAlign = "right";
+        }
         const iconName = String(node.icon || "").trim();
         if (iconName) {
           const ico = svgIcon(iconName, { className: "uxl-B__icon" });
@@ -1962,12 +2003,16 @@
         table.append(colgroup);
         const thead = el("thead");
         const tbody = el("tbody");
+        const defaultAlign = (() => {
+          const a = String(node.textAlign || "").trim().toUpperCase();
+          return a === "L" ? "left" : a === "R" ? "right" : "center";
+        })();
         const thNode = (node.children || []).find((k) => k.tag === "TH");
         if (thNode) {
           const tr = el("tr");
           thNode.cells.forEach((cell, idx) => {
             const colAlign = (node._tcCols?.[idx]?.align || "").toUpperCase();
-            const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : "center";
+            const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : defaultAlign;
             const c = String(node.color || "").trim();
             const style = `text-align:${align};${c ? `color:${c};` : ""}`;
             tr.append(el("th", { style, text: cell }));
@@ -1979,7 +2024,7 @@
           const tr = el("tr");
           td.cells.forEach((cell, idx) => {
             const colAlign = (node._tcCols?.[idx]?.align || "").toUpperCase();
-            const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : "center";
+            const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : defaultAlign;
             const c = String(node.color || "").trim();
             const style = `text-align:${align};${c ? `color:${c};` : ""}`;
             tr.append(el("td", { style, text: cell }));
