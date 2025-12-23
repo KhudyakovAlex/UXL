@@ -535,7 +535,7 @@
 }
 
 .uxl-S__seg--active {
-  background: var(--uxl-accent);
+  background: #3a3a3a;
   color: #ffffff;
 }
 
