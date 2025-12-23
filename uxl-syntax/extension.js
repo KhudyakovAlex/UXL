@@ -32,6 +32,15 @@ function isRootPLine(line) {
   return /^P\b/.test(line);
 }
 
+function isFLine(line) {
+  return /^F\b/.test(line);
+}
+
+function getTagFromLine(line) {
+  const m = /^([A-Za-z]+)\b/.exec(line);
+  return m ? String(m[1] || "").toUpperCase() : "";
+}
+
 function findUxlFenceBlocks(document) {
   const blocks = [];
   const lineCount = document.lineCount;
@@ -73,26 +82,46 @@ function findUxlFenceBlocks(document) {
   return blocks;
 }
 
-function foldingRangesForUxlLines(getLineText, startLine, endLineExclusive, minIndent) {
-  // Compute folding ranges for root-level P blocks.
-  const pLines = [];
+function foldingRangesForUxlLines(getLineText, startLine, endLineExclusive, minIndent, { foldP = true, foldF = true } = {}) {
+  // Folding by indentation:
+  // - P: only at indent=0 (root pages)
+  // - F: at any indent (containers)
+  const starts = [];
+
   for (let i = startLine; i < endLineExclusive; i++) {
     const raw = getLineText(i);
     if (!raw.trim()) continue;
     const normalized = raw.length >= minIndent ? raw.slice(minIndent) : raw;
-    const indent = countLeadingSpaces(normalized);
-    if (indent !== 0) continue;
     const head = normalized.trimStart();
-    if (isRootPLine(head)) pLines.push(i);
+    const indent = countLeadingSpaces(normalized);
+    const tag = getTagFromLine(head);
+
+    if (foldP && tag === "P" && indent === 0) {
+      starts.push({ line: i, indent });
+      continue;
+    }
+    if (foldF && tag === "F") {
+      starts.push({ line: i, indent });
+      continue;
+    }
   }
 
   const ranges = [];
-  for (let idx = 0; idx < pLines.length; idx++) {
-    const pLine = pLines[idx];
-    const nextP = pLines[idx + 1] ?? endLineExclusive;
-    const endLine = nextP - 1;
-    if (endLine > pLine) {
-      ranges.push(new vscode.FoldingRange(pLine, endLine, vscode.FoldingRangeKind.Region));
+  for (const s of starts) {
+    let endLine = s.line;
+    for (let j = s.line + 1; j < endLineExclusive; j++) {
+      const raw = getLineText(j);
+      if (!raw.trim()) continue;
+      const normalized = raw.length >= minIndent ? raw.slice(minIndent) : raw;
+      const indent = countLeadingSpaces(normalized);
+      if (indent <= s.indent) {
+        endLine = j - 1;
+        break;
+      }
+      endLine = j;
+    }
+    if (endLine > s.line) {
+      ranges.push(new vscode.FoldingRange(s.line, endLine, vscode.FoldingRangeKind.Region));
     }
   }
 
@@ -109,6 +138,7 @@ function makeProvider(kind) {
             0,
             document.lineCount,
             0,
+            { foldP: true, foldF: true },
           );
         }
 
@@ -125,6 +155,7 @@ function makeProvider(kind) {
               start,
               endExclusive,
               b.minIndent,
+              { foldP: true, foldF: true },
             ),
           );
         }
