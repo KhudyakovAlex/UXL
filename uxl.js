@@ -1500,7 +1500,7 @@
             });
           }
         }
-      } else if (tag === "I" || tag === "B" || tag === "C") {
+      } else if (tag === "I" || tag === "B" || tag === "C" || tag === "S") {
         if (kids.length) {
           throw new UxlParseError(`${tag} не может иметь дочерних элементов.`, {
             line: node.rawLineNo,
