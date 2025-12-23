@@ -2,12 +2,14 @@
   "name": "uxl-syntax",
   "displayName": "UXL Syntax Highlighting",
   "description": "Syntax highlighting for User Experience Language (UXL) in Markdown and HTML.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "uxl-local",
   "private": true,
   "engines": {
     "vscode": "^1.80.0"
   },
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:markdown", "onLanguage:html", "onLanguage:uxl"],
   "categories": ["Programming Languages"],
   "contributes": {
     "configurationDefaults": {
