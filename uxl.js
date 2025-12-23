@@ -321,17 +321,17 @@
           return {
             format:
               'I\\SRC:<url>|<iconName>\\[SIZE/ALIGN/FIT|CROP/ICON:NAME[:SIZE]/M10/R6/HINT...] (поля в любом порядке; без PADDING). Если SRC — это имя встроенной иконки, рисуется SVG-иконка.',
-            example: "I\\home\\24x24\\IN:LT\\Подсказка иконки",
+            example: "I\\home\\24x24\\OUT:LT\\Подсказка иконки",
           };
         case "B":
           return {
             format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\ICON:search:18\\100x\\IN:RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
+            example: "B\\ICON:search:18\\100x\\OUT:RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return {
             format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
-            example: "C\\Текст\\x20\\IN:LT\\P6\\M4\\FONT:24:BI\\Подсказка",
+            example: "C\\Текст\\x20\\OUT:LT\\P6\\M4\\FONT:24:BI\\Подсказка",
           };
         case "T":
           return {
@@ -381,9 +381,9 @@
       return true;
     }
 
-    function parseInAlignToken(s) {
+    function parseOutAlignToken(s) {
       const v = String(s || "").trim();
-      const m = /^IN:([LRTB]+)$/i.exec(v);
+      const m = /^OUT:([LRTB]+)$/i.exec(v);
       if (!m) return null;
       const a = String(m[1] || "").trim().toUpperCase();
       if (!isAlignToken(a)) return null;
@@ -767,9 +767,12 @@
           setOnce("size", v);
           continue;
         }
-        const inA = parseInAlignToken(v);
-        if (allowAlign && inA) {
-          setOnce("align", inA);
+        if (/^IN:/i.test(v)) {
+          throw formatError(tag, `Поле "${v}" запрещено. Используйте OUT:<ALIGN> (например OUT:LT).`);
+        }
+        const outA = parseOutAlignToken(v);
+        if (allowAlign && outA) {
+          setOnce("align", outA);
           continue;
         }
         if (allowAlign && isAlignToken(v)) {
@@ -969,7 +972,7 @@
         !isIconToken(first) &&
         !isSizeToken(first) &&
         !isAlignToken(first) &&
-        !parseInAlignToken(first) &&
+        !parseOutAlignToken(first) &&
         !isMarginToken(first) &&
         !isPaddingToken(first) &&
         !isRadiusToken(first) &&

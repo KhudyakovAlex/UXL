@@ -18,46 +18,46 @@ P\splash\Splash-окно\GOTOAFTER:2\Ну куда же без него... По�
 P\controllers\Контроллеры\Список контроллеров, которые на связи, и те, к которым когда-то подключались
 
   # Навигация
-  F\IN:T\100%x48
-    I\ICON:settings:36\48x48\IN:RT\M10\#111111\GOTO:controllers_settings\Настройки контроллеров
+  F\OUT:T\100%x48
+    I\ICON:settings:36\48x48\OUT:RT\M10\#111111\GOTO:controllers_settings\Настройки контроллеров
 
   # Основной контент
   F\100%x100%
     F\
       F\100x130\
-        I\ICON:box:100\100x100\#AAAAAA\IN:T
-        C\Этаж1\IN:T\M0\P0\#AAAAAA
+        I\ICON:box:100\100x100\#AAAAAA\OUT:T
+        C\Этаж1\OUT:T\M0\P0\#AAAAAA
       F\100x130\
-        I\ICON:box:100\GOTO:controller\100x100\IN:T\Контроллер на связи
-        C\Этаж2\IN:T\M0\P0
+        I\ICON:box:100\GOTO:controller\100x100\OUT:T\Контроллер на связи
+        C\Этаж2\OUT:T\M0\P0
     F\
       F\100x130\
-        I\ICON:box:100\100x100\#AAAAAA\IN:T
-        C\Этаж3\IN:T\M0\P0\#AAAAAA
+        I\ICON:box:100\100x100\#AAAAAA\OUT:T
+        C\Этаж3\OUT:T\M0\P0\#AAAAAA
       F\100x130\
-        I\ICON:box:100\100x100\#AAAAAA\IN:T\Контроллер не на связи
-        C\Этаж4\IN:T\M0\P0\#AAAAAA
+        I\ICON:box:100\100x100\#AAAAAA\OUT:T\Контроллер не на связи
+        C\Этаж4\OUT:T\M0\P0\#AAAAAA
   
-    I\ICON:search:36\IN:B\48x48\M10\#777777\Поиск контроллеров. Жмем, меняется на курутилку, начинается поиск, заканчивается поиск, возвращается старая иконка
+    I\ICON:search:36\OUT:B\48x48\M10\#777777\Поиск контроллеров. Жмем, меняется на курутилку, начинается поиск, заканчивается поиск, возвращается старая иконка
 
   # Панель ИИ
-  F\IN:B\100%x48\#333333
+  F\OUT:B\100%x48\#333333
     I\ICON:ai:36\48x48\M10\#FFFFFF\Кнопка вызова ИИ-джина
 
 P\controllers_settings\Настройки контроллеров\Настройки списка контроллеров
-  F\IN:LT
-    I\ICON:back:36\48x48\IN:L\M10\#111111\GOTO:controllers\Назад к списку
-    C\Приложение\FONT:24\x48\IN:L\#333333
+  F\OUT:LT
+    I\ICON:back:36\48x48\OUT:L\M10\#111111\GOTO:controllers\Назад к списку
+    C\Приложение\FONT:24\x48\OUT:L\#333333
 
-  F\IN:B\100%x48\#333333
+  F\OUT:B\100%x48\#333333
     I\ICON:ai:36\48x48\M10\#FFFFFF\Кнопка вызова ИИ-джина
 
 P\controller\Контроллер\Страница конкретного контроллера
-  F\IN:LT
-    I\ICON:back:36\48x48\IN:L\M10\#111111\GOTO:controllers\Назад к списку
-    C\Этаж2\FONT:24\x48\IN:L\#333333
+  F\OUT:LT
+    I\ICON:back:36\48x48\OUT:L\M10\#111111\GOTO:controllers\Назад к списку
+    C\Этаж2\FONT:24\x48\OUT:L\#333333
 
-  F\IN:B\100%x48\#333333
+  F\OUT:B\100%x48\#333333
     I\ICON:ai:36\48x48\M10\#FFFFFF\Кнопка вызова ИИ-джина
 
 ```</pre>
