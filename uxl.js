@@ -346,8 +346,8 @@
         case "S":
           return {
             format:
-              "S\\ID\\VALUE\\OPT\\OPT...[\\SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (VALUE — индекс 0..N-1; OPT: пусто (\\\\\\\\), текст или ICON:NAME[:SIZE])",
-            example: "S\\mode\\0\\\\\\ICON:grid3x3\\Сетка\\120x28\\OUT:LT:M6\\IN:M2\\Переключатель",
+              "S\\VALUE\\OPT\\OPT...[\\SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (VALUE — индекс 0..N-1; OPT: пусто (\\\\\\\\), текст или ICON:NAME[:SIZE])",
+            example: "S\\0\\\\ICON:grid3x3\\Сетка\\120x28\\OUT:LT:M6\\IN:M2\\Переключатель",
           };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
@@ -1092,14 +1092,11 @@
     }
 
     if (tag === "S") {
-      const id = String(get(1) || "").trim();
-      const idRe = /^[A-Za-z0-9_-]+$/;
-      if (!id || !idRe.test(id)) throw formatError("S", "ID обязателен и должен быть [A-Za-z0-9_-]+.");
-      const valueRaw = String(get(2) || "").trim();
+      const valueRaw = String(get(1) || "").trim();
       if (!valueRaw) throw formatError("S", "VALUE обязателен (индекс 0..N-1).");
       const value = parseIntNonNegative(valueRaw, meta, "S VALUE");
 
-      const restTokensAll = fields.slice(3);
+      const restTokensAll = fields.slice(2);
       // Options go first, then optional unordered fields. Split at first token that looks like a field.
       const isFieldToken = (t) => {
         const v = String(t || "").trim();
@@ -1175,7 +1172,6 @@
         indent,
         node: {
           tag,
-          id,
           value,
           options,
           padding: rest.paddingPx ?? 2,
