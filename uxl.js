@@ -326,17 +326,17 @@
         case "B":
           return {
             format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\ICON:search:18\\100x\\OUT:RB\\P8\\M6\\R8\\GOTO:users\\Поиск",
+            example: "B\\ICON:search:18\\100x\\OUT:RB:M6\\P8\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return {
             format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
-            example: "C\\Текст\\x20\\OUT:LT\\P6\\M4\\FONT:24:BI\\Подсказка",
+            example: "C\\Текст\\x20\\OUT:LT:M4\\P6\\FONT:24:BI\\Подсказка",
           };
         case "T":
           return {
             format: "T\\COLS:...\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке; P10 задаёт padding ячеек TH/TD)",
-            example: "T\\COLS:20R,80L\\100%x100%\\T\\M10\\P6\\Таблица",
+            example: "T\\COLS:20R,80L\\100%x100%\\OUT:T:M10\\P6\\Таблица",
           };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
@@ -381,13 +381,34 @@
       return true;
     }
 
-    function parseOutAlignToken(s) {
-      const v = String(s || "").trim();
-      const m = /^OUT:([LRTB]+)$/i.exec(v);
-      if (!m) return null;
-      const a = String(m[1] || "").trim().toUpperCase();
-      if (!isAlignToken(a)) return null;
-      return a;
+    function parseOutToken(raw) {
+      const v = String(raw || "").trim();
+      if (!/^OUT:/i.test(v)) return null;
+      const rest = v.slice(4);
+      if (!rest) return null;
+      const parts = rest.split(":").map((p) => p.trim()).filter(Boolean);
+      if (!parts.length) return null;
+
+      let align = "";
+      let marginPx = null;
+
+      for (const p of parts) {
+        if (/^M\d+$/i.test(p)) {
+          const n = parseIntNonNegative(p.slice(1), meta, "MARGIN");
+          if (marginPx != null) throw new UxlParseError("OUT: M указан более одного раза.", meta);
+          marginPx = n;
+          continue;
+        }
+        const up = p.toUpperCase();
+        if (isAlignToken(up)) {
+          if (align) throw new UxlParseError("OUT: ALIGN указан более одного раза.", meta);
+          align = up;
+          continue;
+        }
+        throw new UxlParseError(`OUT: неизвестная часть "${p}". Ожидается OUT:<ALIGN>[:M<number>] или OUT:M<number>[:<ALIGN>].`, meta);
+      }
+
+      return { align, marginPx };
     }
 
     function isActionToken(s) {
@@ -640,8 +661,8 @@
       for (const raw of tokens) {
         const v = String(raw ?? "").trim();
         if (!v) continue;
-        if (isMarginToken(v) && !allowMargin) {
-          throw formatError(tag, `Поле "${v}" (margin) не поддерживается для этого тега.`);
+        if (isMarginToken(v)) {
+          throw formatError(tag, `Поле "${v}" (margin) запрещено. Используйте OUT:<ALIGN>:${v} или OUT:${v}.`);
         }
         if (isPaddingToken(v) && !allowPadding) {
           throw formatError(tag, `Поле "${v}" (padding) не поддерживается для этого тега.`);
@@ -670,11 +691,7 @@
         if (isGotoAfterToken(v) && !allowGotoAfter) {
           throw formatError(tag, `Поле "${v}" (GOTOAFTER) не поддерживается для этого тега.`);
         }
-        if (allowMargin && isMarginToken(v)) {
-          const n = parseIntNonNegative(v.slice(1), meta, "MARGIN");
-          setOnce("margin", n);
-          continue;
-        }
+        // M<number> is forbidden (use OUT:...:M<number> instead).
         if (allowPadding && isPaddingToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "PADDING");
           setOnce("padding", n);
@@ -770,9 +787,16 @@
         if (/^IN:/i.test(v)) {
           throw formatError(tag, `Поле "${v}" запрещено. Используйте OUT:<ALIGN> (например OUT:LT).`);
         }
-        const outA = parseOutAlignToken(v);
-        if (allowAlign && outA) {
-          setOnce("align", outA);
+        const out = parseOutToken(v);
+        if (out) {
+          if (out.align) {
+            if (!allowAlign) throw formatError(tag, `Поле "${v}" (out align) не поддерживается для этого тега.`);
+            setOnce("align", out.align);
+          }
+          if (out.marginPx != null) {
+            if (!allowMargin) throw formatError(tag, `Поле "${v}" (out margin) не поддерживается для этого тега.`);
+            setOnce("margin", out.marginPx);
+          }
           continue;
         }
         if (allowAlign && isAlignToken(v)) {
@@ -972,7 +996,7 @@
         !isIconToken(first) &&
         !isSizeToken(first) &&
         !isAlignToken(first) &&
-        !parseOutAlignToken(first) &&
+        !parseOutToken(first) &&
         !isMarginToken(first) &&
         !isPaddingToken(first) &&
         !isRadiusToken(first) &&
