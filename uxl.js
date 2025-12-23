@@ -2114,13 +2114,30 @@
           // 1) Sizes for fixed nodes (percent nodes treated as 0 on this axis).
           const sz1 = computeAll();
 
+          const fixedByGroup = { top: 0, mid: 0, bottom: 0 };
+          for (const n of kids) {
+            const g = groupKey(n);
+            if (n.size?.[axis]?.unit === "%") continue;
+            fixedByGroup[g] += sz1.get(n.uid)?.[axis] || 0;
+          }
+
           for (const [g, percentNodes] of percentNodesByGroup.entries()) {
+            let availForGroup = availPx ?? 0;
+            if (axis === "h") {
+              // Height % is based on free space within the vertical band:
+              // - top: everything except bottom band
+              // - bottom: everything except top band
+              // - mid: space between top and bottom bands
+              if (g === "top") availForGroup = Math.max(0, availForGroup - fixedByGroup.bottom);
+              else if (g === "bottom") availForGroup = Math.max(0, availForGroup - fixedByGroup.top);
+              else availForGroup = Math.max(0, availForGroup - fixedByGroup.top - fixedByGroup.bottom);
+            }
             const fixedSum = kids.reduce((acc, n) => {
               if (groupKey(n) !== g) return acc;
               if (n.size?.[axis]?.unit === "%") return acc;
               return acc + (sz1.get(n.uid)?.[axis] || 0);
             }, 0);
-            const remaining = Math.max(0, (availPx ?? 0) - fixedSum);
+            const remaining = Math.max(0, availForGroup - fixedSum);
 
             const weights = percentNodes.map((n) => Math.max(0, Number(n.size?.[axis]?.value || 0)));
             const totalW = weights.reduce((a, b) => a + b, 0);
