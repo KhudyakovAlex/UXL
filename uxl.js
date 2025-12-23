@@ -317,11 +317,11 @@
       switch (t) {
         case "P":
           return {
-            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: P10=padding, GOTOAFTER:3, HINT)",
-            example: "P\\users\\Пользователи\\GOTOAFTER:3\\P12\\Подсказка страницы",
+            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, GOTOAFTER:3, HINT)",
+            example: "P\\users\\Пользователи\\GOTOAFTER:3\\IN:M12\\Подсказка страницы",
           };
         case "F":
-          return { format: "F\\[SIZE/ALIGN/P10/#RRGGBB/BG:<url>/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\P12\\#f0f0f0\\Контейнер" };
+          return { format: "F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/#RRGGBB/BG:<url>/HINT...] (поля в любом порядке)", example: "F\\100%x\\T\\IN:M12\\#f0f0f0\\Контейнер" };
         case "I":
           return {
             format:
@@ -330,18 +330,18 @@
           };
         case "B":
           return {
-            format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/M10/P10/R6/HINT...] (поля в любом порядке)",
-            example: "B\\ICON:search:18\\100x\\OUT:RB:M6\\P8\\R8\\GOTO:users\\Поиск",
+            format: "B\\CAPTION|ICON:NAME[:SIZE]\\[SIZE/ALIGN/ACTION/ICON:NAME[:SIZE]/OUT:<ALIGN>[:M10]/IN:M10/R6/HINT...] (поля в любом порядке)",
+            example: "B\\ICON:search:18\\100x\\OUT:RB:M6\\IN:M8\\R8\\GOTO:users\\Поиск",
           };
         case "C":
           return {
-            format: "C\\CAPTION\\[SIZE/ALIGN/M10/P10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
-            example: "C\\Текст\\x20\\OUT:LT:M4\\P6\\FONT:24:BI\\Подсказка",
+            format: "C\\CAPTION\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/FONT:24[:BI]/HINT...] (поля в любом порядке)",
+            example: "C\\Текст\\x20\\OUT:LT:M4\\IN:M6\\FONT:24:BI\\Подсказка",
           };
         case "T":
           return {
-            format: "T\\COLS:...\\[SIZE/ALIGN/M10/P10/HINT...] (поля в любом порядке; P10 задаёт padding ячеек TH/TD)",
-            example: "T\\COLS:20R,80L\\100%x100%\\OUT:T:M10\\P6\\Таблица",
+            format: "T\\COLS:...\\[SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (поля в любом порядке; IN:M10 задаёт padding ячеек TH/TD)",
+            example: "T\\COLS:20R,80L\\100%x100%\\OUT:T:M10\\IN:M6\\Таблица",
           };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
@@ -423,11 +423,35 @@
 
     function parseInToken(raw) {
       const v = String(raw || "").trim();
-      const m = /^IN:([LRTBCM]+)$/i.exec(v);
-      if (!m) return null;
-      const a = String(m[1] || "").trim().toUpperCase();
-      if (!isAlignToken(a)) return null;
-      return { align: a };
+      if (!/^IN:/i.test(v)) return null;
+      const rest = v.slice(3);
+      if (!rest) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].', meta);
+      const parts = rest.split(":").map((p) => p.trim()).filter(Boolean);
+      if (!parts.length) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].', meta);
+
+      let align = "";
+      let paddingPx = null;
+
+      for (const p of parts) {
+        if (/^M\d+$/i.test(p)) {
+          const n = parseIntNonNegative(p.slice(1), meta, "PADDING");
+          if (paddingPx != null) throw new UxlParseError("IN: M (padding) указан более одного раза.", meta);
+          paddingPx = n;
+          continue;
+        }
+        const up = p.toUpperCase();
+        if (isAlignToken(up)) {
+          if (align) throw new UxlParseError("IN: ALIGN указан более одного раза.", meta);
+          align = up;
+          continue;
+        }
+        throw new UxlParseError(`IN: неизвестная часть "${p}". Ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].`, meta);
+      }
+
+      if (!align && paddingPx == null) {
+        throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].', meta);
+      }
+      return { align, paddingPx };
     }
 
     function isActionToken(s) {
@@ -479,7 +503,7 @@
     function parseIntNonNegative(raw, metaForErr, what) {
       const n = Number.parseInt(String(raw), 10);
       if (!Number.isFinite(n) || String(n) !== String(raw).trim()) {
-        throw new UxlParseError(`${what} должно быть целым числом (например ${what === "PADDING" ? "P10" : "M10"}).`, metaForErr);
+        throw new UxlParseError(`${what} должно быть целым числом (например 8).`, metaForErr);
       }
       if (n < 0) throw new UxlParseError(`${what} должно быть >= 0.`, metaForErr);
       return n;
@@ -690,8 +714,8 @@
         if (isMarginToken(v)) {
           throw formatError(tag, `Поле "${v}" (margin) запрещено. Используйте OUT:<ALIGN>:${v} или OUT:${v}.`);
         }
-        if (isPaddingToken(v) && !allowPadding) {
-          throw formatError(tag, `Поле "${v}" (padding) не поддерживается для этого тега.`);
+        if (isPaddingToken(v)) {
+          throw formatError(tag, `Поле "${v}" (padding) запрещено. Используйте IN:M<number> (например IN:M8).`);
         }
         if (isRadiusToken(v) && !allowRadius) {
           throw formatError(tag, `Поле "${v}" (radius) не поддерживается для этого тега.`);
@@ -716,12 +740,6 @@
       }
         if (isGotoAfterToken(v) && !allowGotoAfter) {
           throw formatError(tag, `Поле "${v}" (GOTOAFTER) не поддерживается для этого тега.`);
-        }
-        // M<number> is forbidden (use OUT:...:M<number> instead).
-        if (allowPadding && isPaddingToken(v)) {
-          const n = parseIntNonNegative(v.slice(1), meta, "PADDING");
-          setOnce("padding", n);
-          continue;
         }
         if (allowRadius && isRadiusToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "RADIUS");
@@ -813,11 +831,12 @@
         const inTok = parseInToken(v);
         if (inTok) {
           if (!allowInAlign) throw formatError(tag, `Поле "${v}" (IN) не поддерживается для этого тега.`);
-          setOnce("inAlign", inTok.align);
+          if (inTok.align) setOnce("inAlign", inTok.align);
+          if (inTok.paddingPx != null) setOnce("padding", inTok.paddingPx);
           continue;
         }
         if (/^IN:/i.test(v)) {
-          throw formatError(tag, `Поле "${v}" не распознано. Ожидается IN:<ALIGN> (например IN:LT).`);
+          throw formatError(tag, `Поле "${v}" не распознано. Ожидается IN:<ALIGN>[:M<number>] или IN:M<number>[:<ALIGN>].`);
         }
         const out = parseOutToken(v);
         if (out) {
@@ -866,7 +885,7 @@
       // P supports both forms:
       // - P\CAPTION[\...поля...]
       // - P\ID\CAPTION[\...поля...]  (ID must match [A-Za-z0-9_-]+)
-      // Additional fields are unordered; supported: P10 (padding), GOTOAFTER:<sec>, HINT.
+      // Additional fields are unordered; supported: IN:M10 (padding), IN:<ALIGN> (default child align), GOTOAFTER:<sec>, HINT.
       let id = "";
       let caption = "";
       const idRe = /^[A-Za-z0-9_-]+$/;
@@ -891,7 +910,6 @@
         allowHint: true,
         allowCols: false,
         allowMargin: false,
-        allowPadding: true,
         allowGotoAfter: true,
       });
       const hint = rest.hint || "";
@@ -929,10 +947,10 @@
       const rest = parseUnorderedFields(restTokens, {
         allowSize: true,
         allowAlign: true,
+        allowInAlign: true,
         allowAction: true,
         allowHint: true,
         allowMargin: true,
-        allowPadding: true,
         allowRadius: true,
         allowIcon: true,
         allowColor: true,
@@ -968,10 +986,10 @@
       const rest = parseUnorderedFields(fields.slice(2), {
         allowSize: true,
         allowAlign: true,
+        allowInAlign: true,
         allowAction: true,
         allowHint: true,
         allowMargin: true,
-        allowPadding: true,
         allowColor: true,
         allowFont: true,
       });
@@ -1004,7 +1022,6 @@
         allowAction: false,
         allowHint: true,
         allowMargin: false,
-        allowPadding: true,
         allowSrc: false,
         allowFit: false,
         allowBg: true,
@@ -1111,7 +1128,7 @@
         allowHint: true,
         allowCols: true,
         allowMargin: true,
-        allowPadding: true,
+        allowInAlign: true,
         allowColor: true,
       });
       const sizeStr = rest.sizeStr;
