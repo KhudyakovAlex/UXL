@@ -547,6 +547,7 @@
       "close",
       "codepen",
       "cpu",
+      "delete",
       "edit",
       "grid",
       "grid1x1",
@@ -1968,6 +1969,14 @@
         { tag: "line", attrs: { x1: "20", y1: "14", x2: "23", y2: "14" } },
         { tag: "line", attrs: { x1: "1", y1: "9", x2: "4", y2: "9" } },
         { tag: "line", attrs: { x1: "1", y1: "14", x2: "4", y2: "14" } },
+      ],
+    },
+    delete: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "path", attrs: { d: "M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" } },
+        { tag: "line", attrs: { x1: "18", y1: "9", x2: "12", y2: "15" } },
+        { tag: "line", attrs: { x1: "12", y1: "9", x2: "18", y2: "15" } },
       ],
     },
     edit: {
