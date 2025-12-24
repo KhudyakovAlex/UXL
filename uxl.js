@@ -3318,6 +3318,9 @@
       overlay.setAttribute("width", String(baseW));
       overlay.setAttribute("height", String(baseH));
 
+      // UX decision: interface map shows pages only (no transition lines/arrows).
+      return;
+
       // Merge bidirectional transitions: A<->B is drawn as a single connection with arrows on both ends.
       // Also dedupe multiple A->B (already deduped in ast.edges).
       const byPair = new Map(); // pairKey -> {aKey,bKey,aUid,bUid,ab:boolean,ba:boolean}
