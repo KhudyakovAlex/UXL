@@ -22,33 +22,33 @@ P\controllers\Контроллеры\Список контроллеров, ко
     I\ICON:sliders:36\48x48\OUT:M10\#111111\GOTO:settings\Настройки контроллеров
 
   # Основной контент
-  F\100%x100%\IN:V
-    F\
+  F\f1\100%x100%\OUT:B
+    F\IN:H
       F\100x130\
         I\ICON:box:100\100x100\#AAAAAA\OUT:T
-        C\Этаж1\OUT:T:M0\IN:M0\#AAAAAA
+        C\Этаж 1 - это первый блин этраж\OUT:T:M0\IN:M0:NW\#AAAAAA
       F\100x130\
         I\ICON:box:100\GOTO:controller\100x100\OUT:T\Контроллер на связи
-        C\Этаж2\OUT:T:M0\IN:M0
-    F\
+        C\Этаж 2\OUT:T:M0\IN:M0
+    F\IN:H
       F\100x130\
         I\ICON:box:100\100x100\#AAAAAA\OUT:T
-        C\Этаж3\OUT:T:M0\IN:M0\#AAAAAA
+        C\Этаж 3\OUT:T:M0\IN:M0\#AAAAAA
       F\100x130\
         I\ICON:box:100\100x100\#AAAAAA\OUT:T\Контроллер не на связи
-        C\Этаж4\OUT:T:M0\IN:M0\#AAAAAA
+        C\Этаж 4\OUT:T:M0\IN:M0\#AAAAAA
   
   # Панель ИИ
-  F\OUT:B\100%x48\#333333
+  F\f2\OUT:B\100%x48\#333333
     I\ICON:ai:36\48x48\OUT:M10\#FFFFFF\GOTO:llm\Кнопка вызова ИИ-джина
     S\1\\\80x28\OUT:L:M10\Включение ИИ
     S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
 
 
 P\settings\Настройки\Настройки приложения
-  F\OUT:LT
+  F\OUT:LT\IN:H
     I\ICON:back:36\48x48\OUT:L:M10\#111111\GOTO:controllers\Назад к списку
-    C\Настройки\FONT:24\x48\OUT:L\#333333
+    C\Настройки\FONT:24\x48\OUT:L\IN:NW\#333333
 
   # Основной контент
   F\OUT:TL\IN:V

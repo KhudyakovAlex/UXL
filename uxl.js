@@ -435,19 +435,26 @@
       const v = String(raw || "").trim();
       if (!/^IN:/i.test(v)) return null;
       const rest = v.slice(3);
-      if (!rest) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].', meta);
+      if (!rest) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V][:W|NW] или IN:M<number>[:<ALIGN>][:H|V][:W|NW].', meta);
       const parts = rest.split(":").map((p) => p.trim()).filter(Boolean);
-      if (!parts.length) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].', meta);
+      if (!parts.length) throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V][:W|NW] или IN:M<number>[:<ALIGN>][:H|V][:W|NW].', meta);
 
       let align = "";
       let paddingPx = null;
       let flow = "";
+      let wrap = ""; // W | NW
 
       for (const p of parts) {
         if (/^M\d+$/i.test(p)) {
           const n = parseIntNonNegative(p.slice(1), meta, "PADDING");
           if (paddingPx != null) throw new UxlParseError("IN: M (padding) указан более одного раза.", meta);
           paddingPx = n;
+          continue;
+        }
+        if (/^(W|NW)$/i.test(p)) {
+          const up = p.toUpperCase();
+          if (wrap) throw new UxlParseError("IN: WRAP (W/NW) указан более одного раза.", meta);
+          wrap = up;
           continue;
         }
         if (/^[HV]$/i.test(p)) {
@@ -462,13 +469,13 @@
           align = up;
           continue;
         }
-        throw new UxlParseError(`IN: неизвестная часть "${p}". Ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].`, meta);
+        throw new UxlParseError(`IN: неизвестная часть "${p}". Ожидается IN:<ALIGN>[:M<number>][:H|V][:W|NW] или IN:M<number>[:<ALIGN>][:H|V][:W|NW].`, meta);
       }
 
-      if (!align && paddingPx == null && !flow) {
-        throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V] или IN:M<number>[:<ALIGN>][:H|V].', meta);
+      if (!align && paddingPx == null && !flow && !wrap) {
+        throw new UxlParseError('IN: ожидается IN:<ALIGN>[:M<number>][:H|V][:W|NW] или IN:M<number>[:<ALIGN>][:H|V][:W|NW].', meta);
       }
-      return { align, paddingPx, flow };
+      return { align, paddingPx, flow, wrap };
     }
 
     function isActionToken(s) {
@@ -622,6 +629,7 @@
         allowGotoAfter = false,
         allowColor = false,
       allowFont = false,
+        allowWrap = false, // W | NW (text wrapping inside content tags)
       } = {},
     ) {
       let sizeStr = "";
@@ -641,6 +649,7 @@
       let gotoAfterSec = null;
       let colorHex = "";
     let fontSpec = null;
+      let wrapMode = ""; // "" (default=W) | "W" | "NW"
       let inFlow = "";
       let textAlignStr = "";
 
@@ -758,6 +767,11 @@
         fontSpec = val;
         return;
       }
+        if (kind === "wrap") {
+          if (wrapMode) throw formatError(tag, "WRAP (W/NW) указан более одного раза.");
+          wrapMode = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -790,6 +804,9 @@
       if (isFontToken(v) && !allowFont) {
         throw formatError(tag, `Поле "${v}" (font) не поддерживается для этого тега.`);
       }
+        if ((/^W$/i.test(v) || /^NW$/i.test(v)) && !allowWrap) {
+          throw formatError(tag, `Поле "${v}" (wrap) не поддерживается для этого тега.`);
+        }
         if (isGotoAfterToken(v) && !allowGotoAfter) {
           throw formatError(tag, `Поле "${v}" (GOTOAFTER) не поддерживается для этого тега.`);
         }
@@ -861,6 +878,11 @@
         setOnce("font", spec);
         continue;
       }
+        if (allowWrap && (/^W$/i.test(v) || /^NW$/i.test(v))) {
+          const up = String(v).trim().toUpperCase();
+          setOnce("wrap", up === "NW" ? "NW" : "W");
+          continue;
+        }
         if (allowGotoAfter && isGotoAfterToken(v)) {
           const sec = parseGotoAfterSeconds(v, meta);
           setOnce("gotoAfter", sec);
@@ -897,6 +919,10 @@
             }
           }
           if (inTok.paddingPx != null) setOnce("padding", inTok.paddingPx);
+          if (inTok.wrap) {
+            if (!allowWrap) throw formatError(tag, `Поле "${v}" (IN wrap W/NW) не поддерживается для этого тега.`);
+            setOnce("wrap", inTok.wrap === "NW" ? "NW" : "W");
+          }
           if (inTok.flow) {
             // Flow makes sense only for containers.
             if (tag !== "P" && tag !== "F") throw formatError(tag, `Поле "${v}" (IN flow) не поддерживается для этого тега.`);
@@ -949,6 +975,7 @@
         gotoAfterSec,
         colorHex,
       fontSpec,
+        wrapMode,
       };
     }
 
@@ -992,9 +1019,34 @@
     }
 
     if (tag === "TH" || tag === "TD") {
-      const cells = fields.slice(1);
-      if (cells.length === 0) throw formatError(tag, "Должна быть хотя бы одна ячейка.");
-      return { indent, node: { tag, cells, rawLineNo: lineNo } };
+      // TH/TD: TH\cell\cell...\[W|NW]\[IN:...]
+      const rawCells = fields.slice(1);
+      if (rawCells.length === 0) throw formatError(tag, "Должна быть хотя бы одна ячейка.");
+      let wrap = "";
+      let cellPadding = null;
+
+      // Optional tail IN:... (for wrap + optional per-row cell padding)
+      const lastRaw = String(rawCells[rawCells.length - 1] ?? "").trim();
+      const inTok = /^IN:/i.test(lastRaw) ? parseInToken(lastRaw) : null;
+      if (inTok) {
+        if (inTok.align) throw formatError(tag, `Поле "${lastRaw}" (IN align) не поддерживается для ${tag}.`);
+        if (inTok.flow) throw formatError(tag, `Поле "${lastRaw}" (IN flow) не поддерживается для ${tag}.`);
+        if (inTok.wrap) wrap = inTok.wrap === "NW" ? "NW" : "W";
+        if (inTok.paddingPx != null) cellPadding = inTok.paddingPx;
+        rawCells.pop();
+        if (rawCells.length === 0) throw formatError(tag, "Должна быть хотя бы одна ячейка.");
+      }
+
+      // Legacy tail W|NW (kept for backward compatibility)
+      const last = String(rawCells[rawCells.length - 1] ?? "").trim().toUpperCase();
+      if ((last === "W" || last === "NW") && !wrap) {
+        wrap = last;
+        rawCells.pop();
+        if (rawCells.length === 0) throw formatError(tag, "Должна быть хотя бы одна ячейка.");
+      }
+
+      const cells = rawCells;
+      return { indent, node: { tag, cells, wrap, cellPadding, rawLineNo: lineNo } };
     }
 
     // Per-tag formats (ID is not used anywhere except P):
@@ -1027,6 +1079,7 @@
         allowRadius: true,
         allowIcon: true,
         allowColor: true,
+        allowWrap: true,
       });
       if (!String(caption).trim() && !String(rest.iconName || "").trim()) {
         throw formatError("B", 'Нужен CAPTION или ICON:... (например "B\\Кнопка" или "B\\ICON:home").');
@@ -1048,6 +1101,7 @@
           iconSize: rest.iconSizePx ?? null,
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
+          wrap: rest.wrapMode || "",
           ...common,
           rawLineNo: lineNo,
         },
@@ -1066,6 +1120,7 @@
         allowMargin: true,
         allowColor: true,
         allowFont: true,
+        allowWrap: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1083,6 +1138,7 @@
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           font: rest.fontSpec ? { ...rest.fontSpec } : null,
+          wrap: rest.wrapMode || "",
           ...common,
           rawLineNo: lineNo,
         },
@@ -1185,6 +1241,7 @@
         allowCols: false,
         allowMargin: true,
         allowColor: true,
+        allowWrap: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1199,6 +1256,7 @@
           padding: rest.paddingPx ?? 2,
           margin: rest.marginPx ?? 3,
           color: rest.colorHex || "",
+          wrap: rest.wrapMode || "",
           ...common,
           rawLineNo: lineNo,
         },
@@ -1298,6 +1356,7 @@
         allowMargin: true,
         allowInAlign: true,
         allowColor: true,
+        allowWrap: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1313,6 +1372,7 @@
           cellPadding: rest.paddingPx ?? 5,
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
+          wrap: rest.wrapMode || "",
           ...common,
         rawLineNo: lineNo,
       },
@@ -2111,6 +2171,23 @@
     function renderNode(node, parentEl) {
       const tag = node.tag;
       let nodeEl;
+      const applyWrap = (elOrNull, wrapModeRaw) => {
+        const el = elOrNull;
+        if (!el) return;
+        const w = String(wrapModeRaw || "").trim().toUpperCase();
+        const eff = w === "NW" ? "NW" : "W"; // default=W
+        if (eff === "NW") {
+          el.style.whiteSpace = "nowrap";
+          el.style.overflow = "hidden";
+          el.style.textOverflow = "ellipsis";
+          // For flex children (e.g. button label), allow shrinking:
+          el.style.minWidth = "0";
+        } else {
+          el.style.whiteSpace = "normal";
+          el.style.overflowWrap = "break-word";
+          el.style.wordBreak = "break-word";
+        }
+      };
 
       if (tag === "F") {
         // F is invisible visually, but it must exist as a DOM container to support crop/scroll.
@@ -2136,6 +2213,7 @@
 
       if (tag === "C") {
         nodeEl = el("div", { class: "uxl-node uxl-C", "data-uxl-uid": node.uid, text: node.caption || "" });
+        applyWrap(nodeEl, node.wrap);
         const a = String(node.textAlign || "").trim().toUpperCase();
         if (a === "L") nodeEl.style.textAlign = "left";
         else if (a === "C") nodeEl.style.textAlign = "center";
@@ -2161,7 +2239,12 @@
         }
         if (Number.isFinite(node.iconSize)) nodeEl.style.setProperty("--uxl-icon-size", `${node.iconSize}px`);
         const cap = String(node.caption || "");
-        if (cap.trim()) nodeEl.append(el("span", { class: "uxl-B__label", text: cap }));
+        if (cap.trim()) {
+          const lab = el("span", { class: "uxl-B__label", text: cap });
+          applyWrap(lab, node.wrap);
+          nodeEl.append(lab);
+        }
+        applyWrap(nodeEl, node.wrap);
         const r = Number.isFinite(node.radius) ? node.radius : 6;
         nodeEl.style.borderRadius = `${r}px`;
       } else if (tag === "S") {
@@ -2189,7 +2272,9 @@
               seg.append(svg);
             }
           } else if (opt.kind === "text") {
-            seg.append(el("span", { class: "uxl-S__text", text: String(opt.text ?? "") }));
+            const txt = el("span", { class: "uxl-S__text", text: String(opt.text ?? "") });
+            applyWrap(txt, node.wrap);
+            seg.append(txt);
           } else {
             // empty
           }
@@ -2203,6 +2288,7 @@
           }
         };
         applyActive();
+        applyWrap(nodeEl, node.wrap);
 
         nodeEl.addEventListener("click", () => {
           if (segEls.length < 2) return;
@@ -2255,24 +2341,32 @@
         const thNode = (node.children || []).find((k) => k.tag === "TH");
         if (thNode) {
           const tr = el("tr");
+          const wrapTh = String(thNode.wrap || "").trim().toUpperCase() || String(node.wrap || "").trim().toUpperCase();
           thNode.cells.forEach((cell, idx) => {
             const colAlign = (node._tcCols?.[idx]?.align || "").toUpperCase();
             const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : defaultAlign;
             const c = String(node.color || "").trim();
             const style = `text-align:${align};${c ? `color:${c};` : ""}`;
-            tr.append(el("th", { style, text: cell }));
+            const th = el("th", { style, text: cell });
+            applyWrap(th, wrapTh);
+            if (thNode.cellPadding != null) th.style.padding = `${thNode.cellPadding}px`;
+            tr.append(th);
           });
           thead.append(tr);
         }
         const tdNodes = (node.children || []).filter((k) => k.tag === "TD");
         for (const td of tdNodes) {
           const tr = el("tr");
+          const wrapTd = String(td.wrap || "").trim().toUpperCase() || String(node.wrap || "").trim().toUpperCase();
           td.cells.forEach((cell, idx) => {
             const colAlign = (node._tcCols?.[idx]?.align || "").toUpperCase();
             const align = colAlign === "L" ? "left" : colAlign === "R" ? "right" : defaultAlign;
             const c = String(node.color || "").trim();
             const style = `text-align:${align};${c ? `color:${c};` : ""}`;
-            tr.append(el("td", { style, text: cell }));
+            const tdd = el("td", { style, text: cell });
+            applyWrap(tdd, wrapTd);
+            if (td.cellPadding != null) tdd.style.padding = `${td.cellPadding}px`;
+            tr.append(tdd);
           });
           tbody.append(tr);
         }
@@ -2539,6 +2633,11 @@
             fixedByGroup[g] += sz1.get(n.uid)?.[axis] || 0;
           }
 
+          // Determine if elements on this axis are stacked (share space) or independent.
+          // Default: vertical stacking -> width independent, height shared.
+          // IN:H: horizontal stacking -> width shared, height independent.
+          const isSharedAxis = (inFlow === "H") ? (axis === "w") : (axis === "h");
+
           for (const [g, percentNodes] of percentNodesByGroup.entries()) {
             let availForGroup = availPx ?? 0;
             if (axis === "h") {
@@ -2557,6 +2656,20 @@
             }, 0);
             const remaining = Math.max(0, availForGroup - fixedSum);
 
+            if (!isSharedAxis) {
+              // Independent: each element gets its own percent of the available space.
+              for (const n of percentNodes) {
+                const pct = Math.max(0, Math.min(100, Number(n.size?.[axis]?.value || 0)));
+                const outer = Math.round((remaining * pct) / 100);
+                const m = Number.isFinite(n.margin) ? n.margin : 0;
+                const borderBox = Math.max(0, outer - m * 2);
+                const prev = overrides.get(n.uid) || { w: null, h: null };
+                overrides.set(n.uid, { ...prev, [axis]: borderBox });
+              }
+              continue;
+            }
+
+            // Shared: distribute remaining space proportionally among all percent elements.
             const weights = percentNodes.map((n) => Math.max(0, Number(n.size?.[axis]?.value || 0)));
             const totalW = weights.reduce((a, b) => a + b, 0);
             if (totalW <= 0) continue;
@@ -2621,12 +2734,16 @@
       const maxW = (arr) => arr.reduce((a, n) => Math.max(a, childSize.get(n.uid)?.w || 0), 0);
 
       // IN flow affects "same-anchor stacking" and therefore required band sizes.
+      // Default: vertical stacking within each V-band (same V = stack vertically).
+      // IN:H overrides to horizontal stacking within bands.
       const topH = inFlow === "H" ? maxH(top) : sumH(top);
       const bottomH = inFlow === "H" ? maxH(bottom) : sumH(bottom);
-      const midH = inFlow === "V" ? Math.max(sumH(midL), sumH(midC), sumH(midR)) : maxH(mid);
+      // Mid band: default is vertical stacking (same V = center → stack vertically).
+      const midH = inFlow === "H" ? maxH(mid) : Math.max(sumH(midL), sumH(midC), sumH(midR));
       const neededH = topH + midH + bottomH;
 
-      const midNeededW = inFlow === "V" ? maxW(midL) + maxW(midC) + maxW(midR) : sumW(midL) + sumW(midC) + sumW(midR);
+      // Width: for vertical stacking, need max width across H-groups; for horizontal, need sum.
+      const midNeededW = inFlow === "H" ? sumW(midL) + sumW(midC) + sumW(midR) : maxW(midL) + maxW(midC) + maxW(midR);
       const bandNeededW = inFlow === "H" ? Math.max(sumW(top), sumW(bottom)) : 0;
       const neededW = Math.max(maxW(kids), midNeededW, bandNeededW);
 
@@ -2664,10 +2781,6 @@
         eln.style.top = `${y + m}px`;
         eln.style.width = `${iw}px`;
         eln.style.height = `${ih}px`;
-      }
-
-      function rectsOverlap(a, b) {
-        return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
       }
 
       function splitByHAlign(nodes) {
@@ -2764,96 +2877,50 @@
         return placed;
       }
 
-      function placeBand(nodes, { vAlign, pushDown }) {
-        // vAlign is "T" or "B". If overlaps occur, move along Y away from the edge:
-        // - top band: push down
-        // - bottom band: push up
+      function placeBandVerticalStack(nodes, { vAlign }) {
+        // Stack elements vertically within the band. First in code = higher (smaller Y).
+        // H alignment determines X position. Band is anchored to its V edge.
         const placed = []; // {uid,x,y,w,h}
+        const totalH = sumH(nodes);
+        // Band start Y: T=0, B=parentH-totalH
+        const bandY = vAlign === "T" ? 0 : Math.max(0, placeH - totalH);
+        let y = bandY;
         for (const n of nodes) {
           const sz = childSize.get(n.uid) || { w: 0, h: 0 };
           const hA = effAlign(n).h || null;
-          const pref = alignToXY({ hAlign: hA, vAlign, parentW: placeW, parentH: placeH, w: sz.w, h: sz.h });
-          let x = pref.x;
-          let y = pref.y;
-
-          // Resolve overlaps against already placed nodes in this band.
-          // Deterministic: scan in UXL order; when overlap found, jump past the blocking rect edge.
-          let changed = true;
-          let guard = 0;
-          while (changed && guard++ < 50) {
-            changed = false;
-            for (const p of placed) {
-              const cur = { x, y, w: sz.w, h: sz.h };
-              if (!rectsOverlap(cur, p)) continue;
-              if (pushDown) {
-                y = Math.max(y, p.y + p.h);
-              } else {
-                y = Math.min(y, p.y - sz.h);
-              }
-              changed = true;
-            }
-          }
-
+          const x = hA === "L" ? 0 : hA === "R" ? Math.max(0, placeW - sz.w) : Math.max(0, Math.round((placeW - sz.w) / 2));
           applyBoxStyles(n.uid, x, y);
           placed.push({ uid: n.uid, x, y, w: sz.w, h: sz.h });
+          y += sz.h;
         }
         return placed;
       }
 
-      // 1) Top band: prefer y=0; on overlap push down (keep RT in the corner unless it intersects)
-      const placedTop = placeBandByFlow(top, { vAlign: "T" }) || placeBand(top, { vAlign: "T", pushDown: true });
+      // 1) Top band: vertical stacking, first = top (higher).
+      //    IN:H/V overrides via placeBandByFlow.
+      const placedTop = placeBandByFlow(top, { vAlign: "T" }) || placeBandVerticalStack(top, { vAlign: "T" });
       const topExtent = placedTop.reduce((m, r) => Math.max(m, r.y + r.h), 0);
 
-      // 2) Bottom band: prefer bottom; on overlap push up
-      const placedBottom = placeBandByFlow(bottom, { vAlign: "B" }) || placeBand(bottom, { vAlign: "B", pushDown: false });
+      // 2) Bottom band: vertical stacking, first = higher (closer to center).
+      //    Band as a whole is anchored to the bottom edge.
+      const placedBottom = placeBandByFlow(bottom, { vAlign: "B" }) || placeBandVerticalStack(bottom, { vAlign: "B" });
       const bottomStart = placedBottom.length ? placedBottom.reduce((m, r) => Math.min(m, r.y), placeH) : placeH;
 
-      // 3) Middle band: horizontal packing between top and bottom, centered vertically in the remaining space.
+      // 3) Middle band: vertical stacking by default (same V = center → stack vertically).
+      //    IN:H overrides to horizontal stacking.
       const midAreaY = topExtent;
       const midAreaH = Math.max(0, bottomStart - topExtent);
       const midY = midAreaY + Math.max(0, Math.round((midAreaH - midH) / 2));
 
-      const leftW = inFlow === "V" ? maxW(midL) : sumW(midL);
-      const rightW = inFlow === "V" ? maxW(midR) : sumW(midR);
-      const centerW = inFlow === "V" ? maxW(midC) : sumW(midC);
+      // Width calculation: vertical stacking uses max width; horizontal uses sum.
+      const leftW = inFlow === "H" ? sumW(midL) : maxW(midL);
+      const rightW = inFlow === "H" ? sumW(midR) : maxW(midR);
+      const centerW = inFlow === "H" ? sumW(midC) : maxW(midC);
       const contentW = leftW + centerW + rightW;
       // cw already accounts for neededW (which includes contentW) above.
 
-      if (inFlow === "V") {
-        // Columns: L, C, R in the middle band. Each column stacks top-to-bottom.
-        const betweenL = leftW;
-        const betweenR = Math.max(0, placeW - rightW);
-        const space = Math.max(0, betweenR - betweenL);
-        const startC = betweenL + Math.max(0, Math.round((space - centerW) / 2));
-
-        // L column
-        let y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midL)) / 2));
-        for (const n of midL) {
-          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-          applyBoxStyles(n.uid, 0, y);
-          y += sz.h;
-        }
-
-        // C column (center items within the column width)
-        y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midC)) / 2));
-        for (const n of midC) {
-          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-          const x = startC + Math.max(0, Math.round((centerW - sz.w) / 2));
-          applyBoxStyles(n.uid, x, y);
-          y += sz.h;
-        }
-
-        // R column (right-align items within the column width)
-        y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midR)) / 2));
-        const baseX = Math.max(0, placeW - rightW);
-        for (const n of midR) {
-          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
-          const x = baseX + Math.max(0, rightW - sz.w);
-          applyBoxStyles(n.uid, x, y);
-          y += sz.h;
-        }
-      } else {
-        // Default: rows (legacy behavior)
+      if (inFlow === "H") {
+        // IN:H: horizontal stacking (rows)
         // L group: left to right
         let xL = 0;
         for (const n of midL) {
@@ -2873,7 +2940,7 @@
           applyBoxStyles(n.uid, xR, y);
         }
 
-        // Center group: packed left-to-right, but centered between L and R if possible.
+        // Center group: packed left-to-right, centered between L and R.
         const betweenL = xL;
         const betweenR = xR;
         const space = Math.max(0, betweenR - betweenL);
@@ -2884,6 +2951,41 @@
           const y = midY + Math.max(0, Math.round((midH - sz.h) / 2));
           applyBoxStyles(n.uid, xC, y);
           xC += sz.w;
+        }
+      } else {
+        // Default (and IN:V): vertical stacking (columns).
+        // Elements with same V (center) stack vertically. H determines X position.
+        // First in code = higher (smaller Y).
+        const betweenL = leftW;
+        const betweenR = Math.max(0, placeW - rightW);
+        const space = Math.max(0, betweenR - betweenL);
+        const startC = betweenL + Math.max(0, Math.round((space - centerW) / 2));
+
+        // L column: stack top-to-bottom, left-aligned
+        let y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midL)) / 2));
+        for (const n of midL) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          applyBoxStyles(n.uid, 0, y);
+          y += sz.h;
+        }
+
+        // C column: stack top-to-bottom, center-aligned
+        y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midC)) / 2));
+        for (const n of midC) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const x = startC + Math.max(0, Math.round((centerW - sz.w) / 2));
+          applyBoxStyles(n.uid, x, y);
+          y += sz.h;
+        }
+
+        // R column: stack top-to-bottom, right-aligned
+        y = midAreaY + Math.max(0, Math.round((midAreaH - sumH(midR)) / 2));
+        const baseX = Math.max(0, placeW - rightW);
+        for (const n of midR) {
+          const sz = childSize.get(n.uid) || { w: 0, h: 0 };
+          const x = baseX + Math.max(0, rightW - sz.w);
+          applyBoxStyles(n.uid, x, y);
+          y += sz.h;
         }
       }
 
