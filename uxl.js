@@ -2184,8 +2184,9 @@
           el.style.minWidth = "0";
         } else {
           el.style.whiteSpace = "normal";
-          el.style.overflowWrap = "break-word";
-          el.style.wordBreak = "break-word";
+          // W: wrap only on natural break opportunities (spaces/punctuation), no forced word breaking.
+          el.style.overflowWrap = "normal";
+          el.style.wordBreak = "normal";
         }
       };
 
