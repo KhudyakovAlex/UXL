@@ -318,8 +318,9 @@
       switch (t) {
         case "P":
           return {
-            format: "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, IN:<ALIGN>, IN:H|IN:V, GOTOAFTER:3, HINT)",
-            example: "P\\users\\Пользователи\\GOTOAFTER:3\\IN:M12\\IN:LT\\IN:V\\Подсказка страницы",
+            format:
+              "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, IN:<ALIGN>, IN:H|IN:V, GOTOAFTER:3, TYPE:G, HINT)",
+            example: "P\\users\\Пользователи\\TYPE:G\\GOTOAFTER:3\\IN:M12\\IN:LT\\IN:V\\Подсказка страницы",
           };
         case "F":
           return {
@@ -630,6 +631,7 @@
         allowColor = false,
       allowFont = false,
         allowWrap = false, // W | NW (text wrapping inside content tags)
+        allowType = false, // TYPE:G (pages in map without edges, placed at bottom)
       } = {},
     ) {
       let sizeStr = "";
@@ -650,6 +652,7 @@
       let colorHex = "";
     let fontSpec = null;
       let wrapMode = ""; // "" (default=W) | "W" | "NW"
+      let typeStr = ""; // "" | "G"
       let inFlow = "";
       let textAlignStr = "";
 
@@ -772,6 +775,11 @@
           wrapMode = val;
           return;
         }
+        if (kind === "type") {
+          if (typeStr) throw formatError(tag, "TYPE указан более одного раза.");
+          typeStr = val;
+          return;
+        }
       };
 
       for (const raw of tokens) {
@@ -809,6 +817,9 @@
         }
         if (isGotoAfterToken(v) && !allowGotoAfter) {
           throw formatError(tag, `Поле "${v}" (GOTOAFTER) не поддерживается для этого тега.`);
+        }
+        if (/^TYPE:/i.test(v) && !allowType) {
+          throw formatError(tag, `Поле "${v}" (type) не поддерживается для этого тега.`);
         }
         if (allowRadius && isRadiusToken(v)) {
           const n = parseIntNonNegative(v.slice(1), meta, "RADIUS");
@@ -886,6 +897,13 @@
         if (allowGotoAfter && isGotoAfterToken(v)) {
           const sec = parseGotoAfterSeconds(v, meta);
           setOnce("gotoAfter", sec);
+          continue;
+        }
+        if (allowType && /^TYPE:/i.test(v)) {
+          const m = /^TYPE:(.+)$/i.exec(v);
+          const t = String(m?.[1] || "").trim().toUpperCase();
+          if (t !== "G") throw formatError(tag, 'TYPE пока поддерживает только "TYPE:G".');
+          setOnce("type", "G");
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -976,6 +994,7 @@
         colorHex,
       fontSpec,
         wrapMode,
+        typeStr,
       };
     }
 
@@ -1009,13 +1028,15 @@
         allowCols: false,
         allowMargin: false,
         allowGotoAfter: true,
+        allowType: true,
       });
       const hint = rest.hint || "";
       const padding = rest.paddingPx ?? 0;
       const gotoAfterSec = rest.gotoAfterSec;
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
       const inFlow = rest.inFlow || "";
-      return { indent, node: { tag, id, caption, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
+      const type = rest.typeStr || "";
+      return { indent, node: { tag, id, caption, type, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -3187,6 +3208,8 @@
       grid.append(pageEl);
     }
 
+    const globalUids = new Set(ast.pages.filter((p) => String(p.type || "").trim().toUpperCase() === "G").map((p) => p.uid));
+
     // Put overlay inside the grid so it shares the same coordinate space and size (like hint callouts).
     grid.append(overlay);
     mapScale.append(grid);
@@ -3208,9 +3231,12 @@
     }
 
     function layoutAsTree() {
-      // Root: first page in the block
       const pagesInOrder = ast.pages.map((p) => p.uid);
-      const rootUid = pagesInOrder[0] || null;
+      const pagesGlobal = pagesInOrder.filter((uid) => globalUids.has(uid));
+      const pagesNormal = pagesInOrder.filter((uid) => !globalUids.has(uid));
+
+      // Root: first NON-global page in the block (fallback: first page)
+      const rootUid = pagesNormal[0] || pagesInOrder[0] || null;
       const level = new Map(); // pageUid -> number
       if (rootUid) level.set(rootUid, 0);
 
@@ -3221,6 +3247,7 @@
         const fromUid = ast.pageIdToUid?.[fKey] || null;
         const toUid = ast.pageIdToUid?.[tKey] || null;
         if (!fromUid || !toUid) continue;
+        if (globalUids.has(fromUid) || globalUids.has(toUid)) continue; // TYPE:G pages have no edges on map
         if (!outgoing.has(fromUid)) outgoing.set(fromUid, new Set());
         outgoing.get(fromUid).add(toUid);
       }
@@ -3241,14 +3268,14 @@
         }
       }
 
-      // Unreachable pages: place at level 0 after root, stacked below
-      for (const uid of pagesInOrder) {
+      // Unreachable pages: place at level 0 after root, stacked below (normal pages only)
+      for (const uid of pagesNormal) {
         if (!level.has(uid)) level.set(uid, 0);
       }
 
       // Group by level; preserve original order within each level
       const groups = new Map(); // lvl -> [pageUid]
-      for (const uid of pagesInOrder) {
+      for (const uid of pagesNormal) {
         const lvl = level.get(uid) ?? 0;
         if (!groups.has(lvl)) groups.set(lvl, []);
         groups.get(lvl).push(uid);
@@ -3302,8 +3329,28 @@
         totalH = Math.max(totalH, y);
       }
 
-      grid.style.width = `${Math.max(0, x - colGap)}px`;
-      grid.style.height = `${Math.max(0, totalH - rowGap)}px`;
+      // Place TYPE:G pages as a separate "bottom list" with no edges.
+      let bottomY = Math.max(0, totalH - rowGap);
+      if (pagesGlobal.length) bottomY += rowGap * 2;
+      let gMaxW = 0;
+      let yG = bottomY;
+      for (const uid of pagesGlobal) {
+        const elp = pageEls.get(uid);
+        if (!elp) continue;
+        const s = sizes.get(uid) || { w: 160, h: 48 };
+        gMaxW = Math.max(gMaxW, s.w);
+        elp.style.left = `0px`;
+        elp.style.top = `${yG}px`;
+        elp.style.width = `${s.w}px`;
+        elp.style.height = `${s.h}px`;
+        yG += s.h + rowGap;
+      }
+
+      const normalW = Math.max(0, x - colGap);
+      const finalW = Math.max(normalW, gMaxW);
+      const finalH = pagesGlobal.length ? Math.max(0, yG - rowGap) : Math.max(0, totalH - rowGap);
+      grid.style.width = `${finalW}px`;
+      grid.style.height = `${finalH}px`;
     }
 
     function redraw() {
@@ -3318,9 +3365,6 @@
       overlay.setAttribute("width", String(baseW));
       overlay.setAttribute("height", String(baseH));
 
-      // UX decision: interface map shows pages only (no transition lines/arrows).
-      return;
-
       // Merge bidirectional transitions: A<->B is drawn as a single connection with arrows on both ends.
       // Also dedupe multiple A->B (already deduped in ast.edges).
       const byPair = new Map(); // pairKey -> {aKey,bKey,aUid,bUid,ab:boolean,ba:boolean}
@@ -3328,6 +3372,10 @@
         const aKey = normalizeId(e.fromId);
         const bKey = normalizeId(e.toId);
         if (!aKey || !bKey) continue;
+        const aUid0 = ast.pageIdToUid?.[aKey] || null;
+        const bUid0 = ast.pageIdToUid?.[bKey] || null;
+        if (!aUid0 || !bUid0) continue;
+        if (globalUids.has(aUid0) || globalUids.has(bUid0)) continue; // TYPE:G pages have no edges on map
         const lo = aKey < bKey ? aKey : bKey;
         const hi = aKey < bKey ? bKey : aKey;
         const pairKey = `${lo}<=>${hi}`;

@@ -68,6 +68,7 @@
   - для контейнеров `P/F`: `IN:<ALIGN>` (дефолтное выравнивание детей), `IN:M<number>` (padding), `IN:H|IN:V` (выстраивание детей с одинаковыми якорями)
   - для `B/C/T`: `IN:L|IN:C|IN:R` (выравнивание контента/текста внутри элемента)
 - `ACTION`: `GOTO:<ID>` или `GOTOBACK`
+- `TYPE`: `TYPE:G` (только для `P`) — в карте интерфейса такая страница ставится внизу и считается без связей (стрелки к/от неё не рисуются)
 - `ICON`: `ICON:<name>[:size]` (встроенная пиктограмма для `B`, без внешних файлов). Пример: `ICON:search:18` (px, 8..48). Разрешены: ai, arrow-left, arrow-right, back, box, chevron-left, chevron-right, close, codepen, cpu, edit, grid, grid1x1, grid3x3, grid4x4, home, loader, microphone, plus, search, sliders, sun, settings, trash, volume-2, volume-x. В `B` допускается форма `B\ICON:...` (иконка‑только, без CAPTION).
 - `MARGIN`: задаётся **только внутри `OUT`** как `OUT:...:M<number>` (целые px, одно значение на все стороны; влияет на layout)
 - `PADDING`: задаётся **только внутри `IN`** как `IN:M<number>` (целые px, одно значение на все стороны; влияет на layout)
