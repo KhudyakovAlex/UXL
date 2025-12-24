@@ -378,7 +378,7 @@
   background: var(--uxl-hint);
   flex: 0 0 auto;
   /* Visually center the dot against the first text line (line-height: 1.3) */
-  margin-top: 0.35em;
+  margin-top: 0.45em;
 }
 
 .uxl-hint-badge {
