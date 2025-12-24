@@ -284,7 +284,7 @@ P\users\Пользователи\Хинт второй страницы
 - `ACTION`: начинается с `GOTO:`
 - `#RRGGBB`: цвет (текст и встроенная иконка)
 - `ICON:NAME`: встроенная пиктограмма слева от текста (без внешних файлов)
-  - доступные `NAME`: `ai`, `arrow-left`, `arrow-right`, `back`, `box`, `chevron-left`, `chevron-right`, `close`, `codepen`, `cpu`, `edit`, `grid`, `grid1x1`, `grid3x3`, `grid4x4`, `home`, `loader`, `microphone`, `plus`, `search`, `sliders`, `sun`, `settings`, `trash`, `volume-2`, `volume-x`
+  - доступные `NAME`: `ai`, `arrow-left`, `arrow-right`, `back`, `box`, `check`, `chevron-left`, `chevron-right`, `clock`, `close`, `codepen`, `cpu`, `edit`, `grid`, `grid1x1`, `grid3x3`, `grid4x4`, `home`, `loader`, `menu`, `microphone`, `more-horizontal`, `plus`, `search`, `sliders`, `sun`, `settings`, `trash`, `volume-2`, `volume-x`
   - опционально можно задать размер в px: `ICON:search:18` (диапазон 8..48)
 - `OUT:...:M<number>`: margin кнопки
 - `IN:M<number>`: padding кнопки
@@ -306,15 +306,19 @@ P\users\Пользователи\Хинт второй страницы
 - `arrow-right`
 - `back`
 - `box`
+- `check`
 - `chevron-left`
 - `chevron-right`
+- `clock`
 - `close`
 - `codepen`
 - `cpu`
 - `edit`
 - `grid`
 - `home`
+- `menu`
 - `microphone`
+- `more-horizontal`
 - `plus`
 - `search`
 - `sun`

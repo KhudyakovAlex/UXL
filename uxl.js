@@ -540,8 +540,10 @@
       "arrow-right",
       "back",
       "box",
+      "check",
       "chevron-left",
       "chevron-right",
+      "clock",
       "close",
       "codepen",
       "cpu",
@@ -552,7 +554,9 @@
       "grid4x4",
       "home",
       "loader",
+      "menu",
       "microphone",
+      "more-horizontal",
       "plus",
       "search",
       "sliders",
@@ -1933,6 +1937,14 @@
         { tag: "line", attrs: { x1: "12", y1: "22.08", x2: "12", y2: "12" } },
       ],
     },
+    check: { viewBox: "0 0 24 24", d: ["M20 6L9 17l-5-5"] },
+    clock: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "circle", attrs: { cx: "12", cy: "12", r: "10" } },
+        { tag: "polyline", attrs: { points: "12 6 12 12 16 14" } },
+      ],
+    },
     codepen: {
       viewBox: "0 0 24 24",
       els: [
@@ -2023,6 +2035,14 @@
       viewBox: "0 0 24 24",
       els: [{ tag: "path", attrs: { d: "M21 12a9 9 0 1 1-6.219-8.56" } }],
     },
+    menu: {
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "line", attrs: { x1: "3", y1: "12", x2: "21", y2: "12" } },
+        { tag: "line", attrs: { x1: "3", y1: "6", x2: "21", y2: "6" } },
+        { tag: "line", attrs: { x1: "3", y1: "18", x2: "21", y2: "18" } },
+      ],
+    },
     microphone: {
       viewBox: "0 0 24 24",
       d: [
@@ -2030,6 +2050,15 @@
         "M19 11a7 7 0 0 1-14 0",
         "M12 18v3",
         "M8 21h8",
+      ],
+    },
+    "more-horizontal": {
+      viewBox: "0 0 24 24",
+      mode: "fill",
+      els: [
+        { tag: "circle", attrs: { cx: "12", cy: "12", r: "2" } },
+        { tag: "circle", attrs: { cx: "19", cy: "12", r: "2" } },
+        { tag: "circle", attrs: { cx: "5", cy: "12", r: "2" } },
       ],
     },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
