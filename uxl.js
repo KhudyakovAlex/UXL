@@ -4106,14 +4106,16 @@
 
   function renderAst(ast, { uxlText = "", mode = "permissive", pageInterleaves = null } = {}) {
     const root = el("div", { class: "uxl-root" });
-    root.append(el("div", { class: "uxl-map__title", text: "Превью прототипа" }));
+    const proto = el("div", { class: "uxl-proto-preview" });
+    proto.append(el("div", { class: "uxl-map__title", text: "Превью прототипа" }));
     const toolbar = el("div", { class: "uxl-toolbar" });
     const protoBtn11 = el("button", { class: "uxl-toolbar__btn", type: "button", text: "1:1" });
     protoBtn11.addEventListener("click", () => openPrototypeForText(uxlText, { mode, view: "1:1" }));
     const protoBtnFs = el("button", { class: "uxl-toolbar__btn", type: "button", text: "Full Screen" });
     protoBtnFs.addEventListener("click", () => openPrototypeForText(uxlText, { mode, view: "fullscreen" }));
     toolbar.append(protoBtn11, protoBtnFs);
-    root.append(toolbar);
+    proto.append(toolbar);
+    root.append(proto);
     root.append(el("div", { class: "uxl-map__title", text: "Карта интерфейса" }));
     root.append(renderMap(ast));
     const pagesWrap = el("div", { class: "uxl-pages" });

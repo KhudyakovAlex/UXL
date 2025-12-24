@@ -20,6 +20,11 @@
   align-items: center;
 }
 
+/* Prototype preview block: increase vertical spacing (x3) */
+.uxl-proto-preview {
+  margin: 30px 0;
+}
+
 .uxl-toolbar__btn {
   padding: 6px 10px;
   border: 1px solid var(--uxl-border);
