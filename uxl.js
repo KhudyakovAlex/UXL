@@ -1187,7 +1187,7 @@
         allowInAlign: true,
         allowAction: false,
         allowHint: true,
-        allowMargin: false,
+        allowMargin: true,
         allowSrc: false,
         allowFit: false,
         allowBg: true,
@@ -1201,7 +1201,21 @@
       const common = parseCommon({ caption: "", sizeStr, alignStr, actionStr: "", hint });
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
       const inFlow = rest.inFlow || "";
-      return { indent, node: { tag, id: "", padding: rest.paddingPx ?? 0, inAlign, inFlow, bg, bgColor, ...common, rawLineNo: lineNo } };
+      return {
+        indent,
+        node: {
+          tag,
+          id: "",
+          padding: rest.paddingPx ?? 0,
+          margin: rest.marginPx ?? 0,
+          inAlign,
+          inFlow,
+          bg,
+          bgColor,
+          ...common,
+          rawLineNo: lineNo,
+        },
+      };
     }
 
     if (tag === "S") {
