@@ -3254,7 +3254,8 @@
         const pageBlock = document.querySelector(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
         const headEl = pageBlock?.querySelector(".uxl-page__head") || pageBlock;
         if (!headEl) return;
-        headEl.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
+        const targetTop = headEl.getBoundingClientRect().top + window.pageYOffset - 100;
+        window.scrollTo({ top: targetTop, behavior: "smooth" });
         // Highlight the target page (same as GOTO)
         pageBlock.classList.remove("uxl-page--goto");
         void pageBlock.offsetWidth;
@@ -3631,7 +3632,8 @@
       const pageEl = root.querySelector(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
       const headEl = pageEl?.querySelector(".uxl-page__head") || pageEl;
       if (!headEl) return false;
-      headEl.scrollIntoView({ block: "start", inline: "nearest", behavior: "smooth" });
+      const targetTop = headEl.getBoundingClientRect().top + window.pageYOffset - 100;
+      window.scrollTo({ top: targetTop, behavior: "smooth" });
       if (pageEl) {
         pageEl.classList.remove("uxl-page--goto");
         void pageEl.offsetWidth;
