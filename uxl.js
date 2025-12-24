@@ -1010,13 +1010,27 @@
       let restTokens = [];
       const f1 = get(1);
       const f2 = get(2);
+      const f3 = get(3);
       if (fields.length >= 3 && idRe.test(String(f1).trim())) {
         id = f1;
-        caption = f2;
-        restTokens = fields.slice(3);
+        // Support a permissive variant: P\ID\TYPE:G\CAPTION[\...]
+        // (TYPE is still an unordered field; this just makes authoring less error-prone.)
+        if (/^TYPE:/i.test(String(f2 || "").trim()) && String(f3 || "").trim()) {
+          caption = f3;
+          restTokens = [f2, ...fields.slice(4)];
+        } else {
+          caption = f2;
+          restTokens = fields.slice(3);
+        }
       } else {
-        caption = f1;
-        restTokens = fields.slice(2);
+        // Support permissive variant: P\TYPE:G\CAPTION[\...]
+        if (/^TYPE:/i.test(String(f1 || "").trim()) && String(f2 || "").trim()) {
+          caption = f2;
+          restTokens = [f1, ...fields.slice(3)];
+        } else {
+          caption = f1;
+          restTokens = fields.slice(2);
+        }
       }
 
       const rest = parseUnorderedFields(restTokens, {
