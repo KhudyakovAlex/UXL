@@ -41,15 +41,15 @@
           # Панель ИИ
           F\OUT:B\100%x48\#333333
             I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\Кнопка вызова ИИ-джина
-            S\1\@GOTO:controllers_nollm\@GOTO:controllers\80x28\OUT:L:M10\Включение ИИ
+            S\1\@GOTO:controllers_nollm\\80x28\OUT:L:M10\Включение ИИ
             S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
         
         
-        P\controllers_nollm\Контроллеры\Список контроллеров, которые на связи, и те, к которым когда-то подключались\IN:LT
+        P\controllers_nollm\Контроллеры (ИИ откл)\IN:LT
         
           # Навигация
           F\OUT:T\IN:RT\100%x48
-            I\ICON:sliders:36\48x48\OUT:M10\#111111\GOTO:settings\Настройки контроллеров
+            I\ICON:sliders:36\48x48\OUT:M10\#111111
         
           # Основной контент
           F\100%x100%
@@ -58,20 +58,20 @@
                 I\ICON:box:100\100x100\#AAAAAA\OUT:T
                 C\Этаж1\OUT:T:M0\IN:M0\#AAAAAA
               F\100x130\
-                I\ICON:box:100\GOTO:controller_pass\100x100\OUT:T\Контроллер на связи
+                I\ICON:box:100\100x100\OUT:T\
                 C\Этаж2\OUT:T:M0\IN:M0
             F\IN:H
               F\100x130\
                 I\ICON:box:100\100x100\#AAAAAA\OUT:T
                 C\Этаж3\OUT:T:M0\IN:M0\#AAAAAA
               F\100x130\
-                I\ICON:box:100\100x100\#AAAAAA\OUT:T\Контроллер не на связи
+                I\ICON:box:100\100x100\#AAAAAA\OUT:T\
                 C\Этаж4\OUT:T:M0\IN:M0\#AAAAAA
           
           # Панель ИИ
           F\OUT:B\100%x48\#555555
-            I\ICON:ai:24\48x48\OUT:M10\#AAAAAA\Кнопка вызова ИИ-джина
-            S\0\@GOTO:controllers_nollm\@GOTO:controllers\80x28\OUT:L:M10\Включение ИИ
+            I\ICON:ai:24\48x48\OUT:M10\#AAAAAA\
+            S\0\\@GOTO:controllers\80x28\OUT:L:M10\
             F\80x28\OUT:R:M10
         
         
