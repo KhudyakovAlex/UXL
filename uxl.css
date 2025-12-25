@@ -176,7 +176,7 @@
 
 .uxl-map__title {
   font-weight: 800;
-  font-size: 28px;
+  font-size: 19px;
   line-height: 1.2;
   margin: 0 0 10px;
 }
@@ -262,9 +262,9 @@
 }
 
 .uxl-page__head {
-  padding: 12px 0 20px;
+  padding: 8px 0 14px;
   font-weight: 800;
-  font-size: 28px;
+  font-size: 19px;
   line-height: 1.2;
   display: flex;
   align-items: center;
@@ -284,15 +284,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 38px;
+  height: 38px;
 }
 .uxl-page__link:hover {
   color: var(--uxl-text);
 }
 .uxl-page__link-ico {
-  width: 36px;
-  height: 36px;
+  width: 24px;
+  height: 24px;
 }
 
 @keyframes uxl-goto-title {
