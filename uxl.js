@@ -1788,6 +1788,21 @@
           edges.set(key, { fromId, toId });
         }
       }
+      // S: per-option navigation (OPT@GOTO:...) should also appear on the interface map.
+      if (node.tag === "S") {
+        const fromId = nearestPageId(node);
+        if (fromId) {
+          for (const opt of Array.isArray(node.options) ? node.options : []) {
+            if (!opt || !opt.action || opt.action.type !== "GOTO") continue;
+            const toId = opt.action.target;
+            const fromKey = normalizeId(fromId);
+            const toKey = normalizeId(toId);
+            if (!fromKey || !toKey) continue;
+            const key = `${fromKey}=>${toKey}`;
+            edges.set(key, { fromId, toId });
+          }
+        }
+      }
       for (const ch of node.children || []) collectEdges(ch);
     }
     for (const p of pages) collectEdges(p);
