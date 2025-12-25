@@ -166,7 +166,7 @@
 
 .uxl-map-wrap {
   max-width: 100%;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .uxl-map-scale {
