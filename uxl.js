@@ -3329,15 +3329,6 @@
     }
   }
 
-  function hasNewInTree(node) {
-    // Check if node or any descendant has TYPE:NEW.
-    if (Array.isArray(node.types) && node.types.includes("NEW")) return true;
-    for (const ch of node.children || []) {
-      if (hasNewInTree(ch)) return true;
-    }
-    return false;
-  }
-
   function renderMap(ast) {
     const map = el("div", { class: "uxl-map" });
     const mapWrap = el("div", { class: "uxl-map-wrap" });
@@ -3356,7 +3347,6 @@
       pageEl.innerHTML = formatMapCaption(pageLabel(p));
       pageEl.style.cursor = "pointer";
       pageEl.title = "Перейти к странице";
-      pageEl.style.position = "relative";
       pageEl.addEventListener("click", (ev) => {
         ev.preventDefault();
         const pageUid = pageKey;
@@ -3371,23 +3361,6 @@
         pageBlock.classList.add("uxl-page--goto");
         window.setTimeout(() => pageBlock.classList.remove("uxl-page--goto"), 2400);
       });
-      
-      // Add NEW badge to map tile if page or any child has TYPE:NEW
-      if (hasNewInTree(p)) {
-        const badge = svgIcon("new", { className: "uxl-new-badge" });
-        if (badge) {
-          badge.style.position = "absolute";
-          badge.style.right = "0";
-          badge.style.bottom = "0";
-          badge.style.width = "16px";
-          badge.style.height = "16px";
-          badge.style.backgroundColor = "#c90000";
-          badge.style.pointerEvents = "none";
-          badge.style.zIndex = "10";
-          pageEl.append(badge);
-        }
-      }
-      
       pageEls.set(pageKey, pageEl);
       grid.append(pageEl);
     }
@@ -3709,24 +3682,6 @@
     const win = windowOverride || ast.window;
     canvas.style.width = `${win.w}px`;
     canvas.style.height = `${win.h}px`;
-    canvas.style.position = "relative";
-    
-    // Add NEW badge to canvas if page or any child has TYPE:NEW
-    if (hasNewInTree(pageNode)) {
-      const badge = svgIcon("new", { className: "uxl-new-badge" });
-      if (badge) {
-        badge.style.position = "absolute";
-        badge.style.right = "0";
-        badge.style.bottom = "0";
-        badge.style.width = "16px";
-        badge.style.height = "16px";
-        badge.style.backgroundColor = "#c90000";
-        badge.style.pointerEvents = "none";
-        badge.style.zIndex = "100";
-        canvas.append(badge);
-      }
-    }
-    
     canvasScale.append(canvas);
     canvasWrap.append(canvasScale);
 
