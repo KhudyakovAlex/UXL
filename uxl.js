@@ -351,8 +351,8 @@
         case "S":
           return {
             format:
-              "S\\VALUE\\OPT\\OPT...[\\SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (VALUE — индекс 0..N-1; OPT: пусто (\\\\\\\\), текст или ICON:NAME[:SIZE])",
-            example: "S\\0\\\\ICON:grid3x3\\Сетка\\120x28\\OUT:LT:M6\\IN:M2\\Переключатель",
+              "S\\VALUE\\OPT\\OPT...[\\SIZE/ALIGN/OUT:<ALIGN>[:M10]/IN:M10/HINT...] (VALUE — индекс 0..N-1; OPT: пусто (\\\\\\\\), текст или ICON:NAME[:SIZE]; можно добавить переход: OPT@GOTO:pageId или OPT@GOTOBACK)",
+            example: "S\\0\\\\ICON:grid3x3@GOTO:home\\Сетка@GOTO:users\\120x28\\OUT:LT:M6\\IN:M2\\Переключатель",
           };
         case "TH":
           return { format: "TH\\C\\C\\...", example: "TH\\ID\\ФИО\\Роль" };
@@ -1255,8 +1255,23 @@
       if (optTokens.length < 2) throw formatError("S", "Нужно минимум 2 варианта (OPT).");
 
       const options = optTokens.map((raw) => {
-        const v = String(raw ?? "");
-        if (v === "") return { kind: "empty" };
+        const v0 = String(raw ?? "");
+
+        // Support per-option navigation: OPT@GOTO:pageId or OPT@GOTOBACK
+        // We only treat '@' as a delimiter if the suffix looks like an ACTION token.
+        let v = v0;
+        let optAction = null;
+        const at = v0.lastIndexOf("@");
+        if (at >= 0) {
+          const base = v0.slice(0, at);
+          const suf = v0.slice(at + 1).trim();
+          if (/^GOTOBACK$/i.test(suf) || /^GOTO:/i.test(suf) || /^GOTO:P/i.test(suf)) {
+            optAction = parseAction(suf, meta, mode);
+            v = base;
+          }
+        }
+
+        if (v === "") return { kind: "empty", action: optAction };
         if (isIconToken(v)) {
           const raw2 = String(v.slice("ICON:".length)).trim();
           if (!raw2) throw formatError("S", `ICON в варианте должен быть вида "ICON:NAME" или "ICON:NAME:16".`);
@@ -1275,15 +1290,15 @@
             if (n < min || n > max) throw formatError("S", `ICON size должен быть в диапазоне ${min}..${max} px.`);
             sizePx = n;
           }
-          return { kind: "icon", name, sizePx };
+          return { kind: "icon", name, sizePx, action: optAction };
         }
-        return { kind: "text", text: v };
+        return { kind: "text", text: v, action: optAction };
       });
 
       if (value >= options.length) throw formatError("S", `VALUE=${value} вне диапазона 0..${Math.max(0, options.length - 1)}.`);
 
       for (const t of restTokens) {
-        if (isActionToken(t)) throw formatError("S", `ACTION запрещён (пока просто переключатель без действий).`);
+        if (isActionToken(t)) throw formatError("S", `ACTION запрещён. Для переходов используйте OPT@GOTO:pageId или OPT@GOTOBACK внутри вариантов.`);
       }
 
       const rest = parseUnorderedFields(restTokens, {
@@ -2349,6 +2364,14 @@
         for (let i = 0; i < n; i++) {
           const opt = opts[i] || {};
           const seg = el("div", { class: "uxl-S__seg" });
+          // Allow per-segment navigation (wired later via data-uxl-action).
+          // Keep data-uxl-uid so existing navigation stack logic can resolve "current page" from node uid.
+          seg.setAttribute("data-uxl-uid", String(node.uid));
+          seg.setAttribute("data-uxl-s-idx", String(i));
+          if (opt.action && (opt.action.type === "GOTO" || opt.action.type === "GOTOBACK")) {
+            const a = opt.action.type === "GOTOBACK" ? "GOTOBACK" : `GOTO:${String(opt.action.target || "").trim()}`;
+            seg.setAttribute("data-uxl-action", a);
+          }
           if (opt.kind === "icon" && opt.name) {
             const svg = svgIcon(opt.name, { className: "uxl-S__icon" });
             if (svg) {
@@ -2378,11 +2401,13 @@
         applyActive();
         applyWrap(nodeEl, node.wrap);
 
-        nodeEl.addEventListener("click", () => {
-          if (segEls.length < 2) return;
-          cur = (cur + 1) % segEls.length;
-          applyActive();
-        });
+        // Click a specific segment to select it.
+        for (let i = 0; i < segEls.length; i++) {
+          segEls[i].addEventListener("click", () => {
+            cur = i;
+            applyActive();
+          });
+        }
       } else if (tag === "I") {
         const hasAction = !!(node.action && node.action.type === "GOTO");
         nodeEl = el(hasAction ? "button" : "div", {
@@ -3679,7 +3704,14 @@
         const uid = elx.getAttribute("data-uxl-uid");
         if (!uid) continue;
         const node = ast.nodeByUid?.get(uid) || null;
-        if (!node || !node.action || (node.action.type !== "GOTO" && node.action.type !== "GOTOBACK")) continue;
+        const aAttr = (elx.getAttribute("data-uxl-action") || "").trim();
+        const action =
+          aAttr && (/^GOTOBACK$/i.test(aAttr) || /^GOTO:/i.test(aAttr) || /^GOTO:P/i.test(aAttr))
+            ? (aAttr.toUpperCase() === "GOTOBACK"
+                ? { type: "GOTOBACK" }
+                : { type: "GOTO", target: aAttr.replace(/^GOTO:P/i, "").replace(/^GOTO:/i, "").trim() })
+            : node?.action || null;
+        if (!node || !action || (action.type !== "GOTO" && action.type !== "GOTOBACK")) continue;
         elx.style.cursor = "pointer";
         elx.addEventListener("click", (ev) => {
           ev.preventDefault();
@@ -3688,7 +3720,7 @@
           const fromUid = nearestPageUidFromNode(node);
           ensureTopIs(fromUid);
 
-          if (node.action.type === "GOTOBACK") {
+          if (action.type === "GOTOBACK") {
             if (nav.stack.length <= 1) return;
             nav.stack.pop(); // drop current
             const backUid = nav.stack[nav.stack.length - 1] || null;
@@ -3696,7 +3728,7 @@
             return;
           }
 
-          const targetId = String(node.action.target || "").trim();
+          const targetId = String(action.target || "").trim();
           const targetKey = normalizeId(targetId);
           const pageUid = ast.pageIdToUid?.[targetKey] || null;
           if (!pageUid) {
@@ -4061,12 +4093,19 @@
         const uid = elx.getAttribute("data-uxl-uid");
         if (!uid) continue;
         const node = ast.nodeByUid?.get(uid) || null;
-        if (!node || !node.action || (node.action.type !== "GOTO" && node.action.type !== "GOTOBACK")) continue;
+        const aAttr = (elx.getAttribute("data-uxl-action") || "").trim();
+        const action =
+          aAttr && (/^GOTOBACK$/i.test(aAttr) || /^GOTO:/i.test(aAttr) || /^GOTO:P/i.test(aAttr))
+            ? (aAttr.toUpperCase() === "GOTOBACK"
+                ? { type: "GOTOBACK" }
+                : { type: "GOTO", target: aAttr.replace(/^GOTO:P/i, "").replace(/^GOTO:/i, "").trim() })
+            : node?.action || null;
+        if (!node || !action || (action.type !== "GOTO" && action.type !== "GOTOBACK")) continue;
         elx.style.cursor = "pointer";
         elx.addEventListener("click", (ev) => {
           ev.preventDefault();
 
-          if (node.action.type === "GOTOBACK") {
+          if (action.type === "GOTOBACK") {
             if (navStack.length <= 1) return;
             navStack.pop(); // drop current
             const backUid = navStack[navStack.length - 1] || null;
@@ -4074,7 +4113,7 @@
             return;
           }
 
-          const targetId = String(node.action.target || "").trim();
+          const targetId = String(action.target || "").trim();
           const targetKey = normalizeId(targetId);
           const targetUid = ast.pageIdToUid?.[targetKey] || null;
           if (!targetUid) {
