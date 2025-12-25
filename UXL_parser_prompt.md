@@ -71,7 +71,7 @@
 - `TYPE`: `TYPE:G:NEW` (для всех тегов) — метки типа (можно указывать несколько через `:`):
   - `G` — "глобальная" страница (только для `P`): в карте интерфейса ставится внизу и считается без связей (стрелки к/от неё не рисуются)
   - `NEW` — бейдж `new` в правом нижнем углу (24x24) у элементов; на плитке карты и на canvas страницы появляется, если у `P` или любого дочернего элемента есть `TYPE:NEW`
-- `ICON`: `ICON:<name>[:size]` (встроенная пиктограмма для `B`, без внешних файлов). Пример: `ICON:search:18` (px, 8..48). Разрешены: ai, arrow-left, arrow-right, back, box, check, chevron-left, chevron-right, clock, close, codepen, cpu, delete, edit, grid, grid1x1, grid3x3, grid4x4, home, loader, menu, microphone, more-horizontal, new, plus, search, sliders, sun, settings, trash, volume-2, volume-x. В `B` допускается форма `B\ICON:...` (иконка‑только, без CAPTION).
+- `ICON`: `ICON:<name>[:size]` (встроенная пиктограмма для `B`, без внешних файлов). Пример: `ICON:search:18` (px, 8..48). Разрешены: ai, arrow-left, arrow-right, back, box, check, chevron-left, chevron-right, clock, close, codepen, cpu, delete, edit, grid, grid1x1, grid3x3, grid4x4, home, link, loader, menu, microphone, more-horizontal, new, plus, search, sliders, sun, settings, trash, volume-2, volume-x. В `B` допускается форма `B\ICON:...` (иконка‑только, без CAPTION).
 - `MARGIN`: задаётся **только внутри `OUT`** как `OUT:...:M<number>` (целые px, одно значение на все стороны; влияет на layout)
 - `PADDING`: задаётся **только внутри `IN`** как `IN:M<number>` (целые px, одно значение на все стороны; влияет на layout)
 - `RADIUS`: `R<number>` (целые px; пока используется только для `B` как скругление углов)

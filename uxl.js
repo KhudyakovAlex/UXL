@@ -554,6 +554,7 @@
       "grid3x3",
       "grid4x4",
       "home",
+      "link",
       "loader",
       "menu",
       "microphone",
@@ -2101,6 +2102,14 @@
       ],
     },
     home: { viewBox: "0 0 24 24", d: ["M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"] },
+    link: {
+      viewBox: "0 0 24 24",
+      d: [
+        // Feather "link"
+        "M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1",
+        "M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1",
+      ],
+    },
     loader: {
       viewBox: "0 0 24 24",
       els: [{ tag: "path", attrs: { d: "M21 12a9 9 0 1 1-6.219-8.56" } }],
