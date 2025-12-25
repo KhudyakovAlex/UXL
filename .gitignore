@@ -1,3 +1,5 @@
 *.vsix
 uxl-syntax/*.vsix
 
+
+usage.html
