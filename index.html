@@ -42,6 +42,7 @@
           F\OUT:B\100%x48\#333333
             I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\Кнопка вызова ИИ-джина
             S\1\@GOTO:controllers_nollm\@GOTO:controllers\80x28\OUT:L:M10\Включение ИИ
+            S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
         
         
         P\controllers_nollm\Контроллеры\Список контроллеров, которые на связи, и те, к которым когда-то подключались\IN:LT
@@ -123,6 +124,7 @@
           F\OUT:B\100%x48\#333333
             I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\Кнопка вызова ИИ-джина
             S\1\\\80x28\OUT:L:M10\Включение ИИ
+            S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
         
         P\controller_pass\Контроллер\Страница ввода пароля контроллера
           F\OUT:LT\IN:H
@@ -160,6 +162,7 @@
           F\OUT:B\100%x48\#333333
             I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\
             S\1\\\80x28\OUT:L:M10\
+            S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\
         
         P\controller\Контроллер\Разблокированный контроллер
           F\OUT:LT\IN:H
@@ -170,6 +173,7 @@
           F\OUT:B\100%x48\#333333
             I\ICON:ai:36\48x48\OUT:M10\GOTO:llm\#FFFFFF\Кнопка вызова ИИ-джина
             S\1\\\80x28\OUT:L:M10\Включение ИИ
+            S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10\Включение/отключение озвучки ИИ
         P\llm\Чат с LLM\TYPE:G\Страница общения с ИИ-джином. Вернее, не страница, а выдвигающаяся поверх всего остального интерфейса панель с чатом ИИ.
           F\OUT:LT\IN:H
             I\ICON:back:36\48x48\OUT:L:M10\#111111\GOTOBACK
@@ -199,6 +203,7 @@
           F\OUT:B\100%x48\#333333
             I\ICON:ai:36\48x48\OUT:M10\#FFFFFF
             S\1\\\80x28\OUT:L:M10
+            S\1\ICON:volume-2:24\ICON:volume-x:24\80x28\OUT:R:M10
         
         P\delete_controller\Удаление контроллера\TYPE:G
           F\100%x100%
