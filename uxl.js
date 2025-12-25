@@ -3311,14 +3311,18 @@
   function addNewBadgeAbs(parentEl, { sizePx = 36, z = 10 } = {}) {
     const badge = svgIcon("new", { className: "uxl-new-badge" });
     if (!badge) return;
-    // parentEl is usually already positioned via CSS (e.g. map tiles are position:absolute).
-    // Do NOT override it based on inline styles. Only set relative if it is actually static.
-    try {
-      const pos = window.getComputedStyle(parentEl).position;
-      if (!pos || pos === "static") parentEl.style.position = "relative";
-    } catch {
-      // Fallback: keep previous behavior only if no inline position is set.
-      if (!parentEl.style.position) parentEl.style.position = "relative";
+    // Don't ever override explicit inline positioning.
+    if (!parentEl.style.position) {
+      // If element isn't connected yet, computed styles may be "static" even when CSS will later set absolute.
+      // In that case, do NOT touch positioning (prevents map tiles from breaking when NEW is present).
+      if (parentEl.isConnected) {
+        try {
+          const pos = window.getComputedStyle(parentEl).position;
+          if (!pos || pos === "static") parentEl.style.position = "relative";
+        } catch {
+          // If we can't compute, leave it alone.
+        }
+      }
     }
     badge.style.position = "absolute";
     badge.style.right = "0";
@@ -3683,28 +3687,23 @@
     function applyMapScaleToFitWidth() {
       const vv = window.visualViewport;
       const vw = vv ? vv.width : window.innerWidth;
-      const mobile = vw <= 900;
+      const vh = vv ? vv.height : window.innerHeight;
 
-      if (!mobile) {
-        mapScale.style.transform = "";
-        mapScale.style.transformOrigin = "";
-        mapScale.style.width = "";
-        mapScale.style.height = "";
-        return;
-      }
-
-      // Scale down only (never upscale) so the map fits the available width.
+      // Scale down only (never upscale) so the map fits available width/height (no scrollbars).
       const availW = mapWrap.clientWidth || map.getBoundingClientRect().width || vw;
       const baseW = grid.offsetWidth || 1; // offsetWidth ignores transform; good for baseline
       const baseH = grid.offsetHeight || 1;
       const pad = 8;
-      const scale = Math.max(0.1, Math.min(1, (availW - pad * 2) / baseW));
+      const top = mapWrap.getBoundingClientRect().top;
+      const availH = Math.max(0, vh - top - pad);
+      const scale = Math.max(0.1, Math.min(1, (availW - pad * 2) / baseW, (availH - pad * 2) / baseH));
 
       mapScale.style.transformOrigin = "top left";
       mapScale.style.transform = `scale(${scale})`;
       // Make the wrapper's layout size match the transformed size to avoid extra overflow/blank space.
       mapScale.style.width = `${Math.round(baseW * scale)}px`;
       mapScale.style.height = `${Math.round(baseH * scale)}px`;
+      mapWrap.style.height = `${Math.round(baseH * scale)}px`;
     }
 
     relayoutAndRedraw();
