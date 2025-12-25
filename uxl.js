@@ -2550,7 +2550,7 @@
       if (node.hint) nodeEl.title = node.hint;
       if ((tag === "C" || tag === "B") && Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
       
-      // TYPE:NEW badge (icon "new": red diagonal + white strokes, 24x24px)
+      // TYPE:NEW badge (red background + white "new" icon in bottom-right corner)
       if (Array.isArray(node.types) && node.types.includes("NEW")) {
         nodeEl.style.position = "relative";
         const badge = svgIcon("new", { className: "uxl-new-badge" });
@@ -2558,8 +2558,9 @@
           badge.style.position = "absolute";
           badge.style.right = "0";
           badge.style.bottom = "0";
-          badge.style.width = "24px";
-          badge.style.height = "24px";
+          badge.style.width = "16px";
+          badge.style.height = "16px";
+          badge.style.backgroundColor = "#c90000";
           badge.style.pointerEvents = "none";
           badge.style.zIndex = "10";
           nodeEl.append(badge);
@@ -3378,8 +3379,9 @@
           badge.style.position = "absolute";
           badge.style.right = "0";
           badge.style.bottom = "0";
-          badge.style.width = "24px";
-          badge.style.height = "24px";
+          badge.style.width = "16px";
+          badge.style.height = "16px";
+          badge.style.backgroundColor = "#c90000";
           badge.style.pointerEvents = "none";
           badge.style.zIndex = "10";
           pageEl.append(badge);
@@ -3716,8 +3718,9 @@
         badge.style.position = "absolute";
         badge.style.right = "0";
         badge.style.bottom = "0";
-        badge.style.width = "24px";
-        badge.style.height = "24px";
+        badge.style.width = "16px";
+        badge.style.height = "16px";
+        badge.style.backgroundColor = "#c90000";
         badge.style.pointerEvents = "none";
         badge.style.zIndex = "100";
         canvas.append(badge);
