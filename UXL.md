@@ -200,9 +200,12 @@ P\users\Пользователи\Хинт второй страницы
 
 - `IN:M<number>` — padding страницы
 - `GOTOAFTER:<seconds>` — авто‑переход на **следующую страницу** через указанное количество секунд (например `GOTOAFTER:3` или `GOTOAFTER:1.5`). **Срабатывает только в просмотре прототипа (1:1 / Full Screen)**.
-- `TYPE:G` — “глобальная” страница для карты интерфейса:
-  - в **карте интерфейса** ставится отдельным списком **внизу** и считается **без связей** (стрелки к/от неё не рисуются)
-  - на рендер/прототип (GOTO/GOTOBACK) это поле **не влияет**
+- `TYPE:G:NEW` — метки типа (можно указывать несколько через `:`):
+  - `G` — “глобальная” страница для карты интерфейса:
+    - в **карте интерфейса** ставится отдельным списком **внизу** и считается **без связей** (стрелки к/от неё не рисуются)
+    - на рендер/прототип (GOTO/GOTOBACK) это поле **не влияет**
+  - `NEW` — бейдж `new` в правом нижнем углу (24x24) у элементов; на плитке карты и на canvas страницы появляется, если у `P` или любого дочернего элемента есть `TYPE:NEW`
+  - Примеры: `TYPE:G:NEW`, `TYPE:G`, `TYPE:NEW`
 - `HINT` — подсказка страницы
 
 Если `ID` не указан, то запись `P\CAPTION\HINT` допустима: второе поле трактуется как `CAPTION`, третье — как `HINT`.
@@ -284,7 +287,7 @@ P\users\Пользователи\Хинт второй страницы
 - `ACTION`: начинается с `GOTO:`
 - `#RRGGBB`: цвет (текст и встроенная иконка)
 - `ICON:NAME`: встроенная пиктограмма слева от текста (без внешних файлов)
-  - доступные `NAME`: `ai`, `arrow-left`, `arrow-right`, `back`, `box`, `check`, `chevron-left`, `chevron-right`, `clock`, `close`, `codepen`, `cpu`, `delete`, `edit`, `grid`, `grid1x1`, `grid3x3`, `grid4x4`, `home`, `loader`, `menu`, `microphone`, `more-horizontal`, `plus`, `search`, `sliders`, `sun`, `settings`, `trash`, `volume-2`, `volume-x`
+  - доступные `NAME`: `ai`, `arrow-left`, `arrow-right`, `back`, `box`, `check`, `chevron-left`, `chevron-right`, `clock`, `close`, `codepen`, `cpu`, `delete`, `edit`, `grid`, `grid1x1`, `grid3x3`, `grid4x4`, `home`, `loader`, `menu`, `microphone`, `more-horizontal`, `new`, `plus`, `search`, `sliders`, `sun`, `settings`, `trash`, `volume-2`, `volume-x`
   - опционально можно задать размер в px: `ICON:search:18` (диапазон 8..48)
 - `OUT:...:M<number>`: margin кнопки
 - `IN:M<number>`: padding кнопки
@@ -320,6 +323,7 @@ P\users\Пользователи\Хинт второй страницы
 - `menu`
 - `microphone`
 - `more-horizontal`
+- `new`
 - `plus`
 - `search`
 - `sun`

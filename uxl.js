@@ -558,6 +558,7 @@
       "menu",
       "microphone",
       "more-horizontal",
+      "new",
       "plus",
       "search",
       "sliders",
@@ -636,7 +637,7 @@
         allowColor = false,
       allowFont = false,
         allowWrap = false, // W | NW (text wrapping inside content tags)
-        allowType = false, // TYPE:G (pages in map without edges, placed at bottom)
+        allowType = false, // TYPE:G[:NEW] (G only for P; NEW allowed for all tags)
       } = {},
     ) {
       let sizeStr = "";
@@ -657,7 +658,7 @@
       let colorHex = "";
     let fontSpec = null;
       let wrapMode = ""; // "" (default=W) | "W" | "NW"
-      let typeStr = ""; // "" | "G"
+      let types = []; // ["G","NEW"] etc
       let inFlow = "";
       let textAlignStr = "";
 
@@ -781,8 +782,8 @@
           return;
         }
         if (kind === "type") {
-          if (typeStr) throw formatError(tag, "TYPE указан более одного раза.");
-          typeStr = val;
+          if (types.length) throw formatError(tag, "TYPE указан более одного раза.");
+          types = Array.isArray(val) ? val : [];
           return;
         }
       };
@@ -906,9 +907,26 @@
         }
         if (allowType && /^TYPE:/i.test(v)) {
           const m = /^TYPE:(.+)$/i.exec(v);
-          const t = String(m?.[1] || "").trim().toUpperCase();
-          if (t !== "G") throw formatError(tag, 'TYPE пока поддерживает только "TYPE:G".');
-          setOnce("type", "G");
+          const raw = String(m?.[1] || "").trim();
+          const parts = raw.split(":").map((s) => String(s || "").trim()).filter(Boolean);
+          const uniq = new Set();
+          for (const p of parts) {
+            const t = p.toUpperCase();
+            if (t === "NEW") {
+              uniq.add("NEW");
+              continue;
+            }
+            if (t === "G") {
+              if (tag === "P") {
+                uniq.add("G");
+                continue;
+              }
+              if (mode === "strict") throw formatError(tag, 'TYPE:G допустим только для тега P.');
+              continue; // permissive: ignore
+            }
+            if (mode === "strict") throw formatError(tag, 'TYPE поддерживает только значения "G" и "NEW".');
+          }
+          setOnce("type", Array.from(uniq.values()));
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -999,7 +1017,7 @@
         colorHex,
       fontSpec,
         wrapMode,
-        typeStr,
+        types,
       };
     }
 
@@ -1054,8 +1072,9 @@
       const gotoAfterSec = rest.gotoAfterSec;
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
       const inFlow = rest.inFlow || "";
-      const type = rest.typeStr || "";
-      return { indent, node: { tag, id, caption, type, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
+      const types = Array.isArray(rest.types) ? rest.types : [];
+      const type = types.includes("G") ? "G" : "";
+      return { indent, node: { tag, id, caption, type, types, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -1120,6 +1139,7 @@
         allowIcon: true,
         allowColor: true,
         allowWrap: true,
+        allowType: true,
       });
       if (!String(caption).trim() && !String(rest.iconName || "").trim()) {
         throw formatError("B", 'Нужен CAPTION или ICON:... (например "B\\Кнопка" или "B\\ICON:home").');
@@ -1142,6 +1162,7 @@
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           wrap: rest.wrapMode || "",
+          types: Array.isArray(rest.types) ? rest.types : [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1161,6 +1182,7 @@
         allowColor: true,
         allowFont: true,
         allowWrap: true,
+        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1179,6 +1201,7 @@
           color: rest.colorHex || "",
           font: rest.fontSpec ? { ...rest.fontSpec } : null,
           wrap: rest.wrapMode || "",
+          types: Array.isArray(rest.types) ? rest.types : [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1197,6 +1220,7 @@
         allowFit: false,
         allowBg: true,
         allowColor: true,
+        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1217,6 +1241,7 @@
           inFlow,
           bg,
           bgColor,
+          types: Array.isArray(rest.types) ? rest.types : [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1311,6 +1336,7 @@
         allowMargin: true,
         allowColor: true,
         allowWrap: true,
+        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1326,6 +1352,7 @@
           margin: rest.marginPx ?? 3,
           color: rest.colorHex || "",
           wrap: rest.wrapMode || "",
+          types: Array.isArray(rest.types) ? rest.types : [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1374,6 +1401,7 @@
         allowFit: true,
         allowBg: false,
         allowColor: true,
+        allowType: true,
       });
       let src = String(rest.srcUrl || "").trim();
       let icon = String(rest.iconName || "").trim().toLowerCase();
@@ -1409,6 +1437,7 @@
           margin: rest.marginPx ?? 0,
           radius: rest.radiusPx ?? 0,
           color: rest.colorHex || "",
+          types: Array.isArray(rest.types) ? rest.types : [],
           ...common,
         rawLineNo: lineNo,
       },
@@ -1426,6 +1455,7 @@
         allowInAlign: true,
         allowColor: true,
         allowWrap: true,
+        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1442,6 +1472,7 @@
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           wrap: rest.wrapMode || "",
+          types: Array.isArray(rest.types) ? rest.types : [],
           ...common,
         rawLineNo: lineNo,
       },
@@ -2100,6 +2131,17 @@
         { tag: "circle", attrs: { cx: "5", cy: "12", r: "2" } },
       ],
     },
+    new: {
+      // Provided SVG (24x24). Red diagonal (#c90000) + white strokes (0.75px).
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "polygon", attrs: { points: "0 24 24 0 24 14.83 14.83 24 0 24", fill: "#c90000", stroke: "none" } },
+        { tag: "polyline", attrs: { points: "11.09 22.54 8.39 19.85 13.55 20.08 10.86 17.38", stroke: "#fff", "stroke-width": "0.75" } },
+        { tag: "polyline", attrs: { points: "14.89 13.35 12.3 15.94 14.99 18.64 17.58 16.05", stroke: "#fff", "stroke-width": "0.75" } },
+        { tag: "polyline", attrs: { points: "16 12.24 19.99 13.65 18.47 9.78 22.34 11.29 20.82 7.42", stroke: "#fff", "stroke-width": "0.75" } },
+        { tag: "line", attrs: { x1: "15.82", y1: "15.11", x2: "13.64", y2: "17.29", stroke: "#fff", "stroke-width": "0.75" } },
+      ],
+    },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
     search: { viewBox: "0 0 24 24", d: ["M10.5 18a7.5 7.5 0 1 1 0-15a7.5 7.5 0 0 1 0 15z", "M16.5 16.5 21 21"] },
     sliders: {
@@ -2326,6 +2368,7 @@
         domByUid.set(node.uid, nodeEl);
         parentEl.append(nodeEl);
         for (const ch of node.children || []) renderNode(ch, nodeEl);
+        if (Array.isArray(node.types) && node.types.includes("NEW")) addNewBadgeAbs(nodeEl, { sizePx: 24, z: 50 });
         return nodeEl;
       }
 
@@ -2517,6 +2560,7 @@
 
       if (node.hint) nodeEl.title = node.hint;
       if ((tag === "C" || tag === "B") && Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
+      if (Array.isArray(node.types) && node.types.includes("NEW")) addNewBadgeAbs(nodeEl, { sizePx: 24, z: 50 });
       domByUid.set(node.uid, nodeEl);
       parentEl.append(nodeEl);
 
@@ -3247,6 +3291,29 @@
     return id;
   }
 
+  function hasNewInTree(node) {
+    if (Array.isArray(node?.types) && node.types.includes("NEW")) return true;
+    for (const ch of node?.children || []) {
+      if (hasNewInTree(ch)) return true;
+    }
+    return false;
+  }
+
+  function addNewBadgeAbs(parentEl, { sizePx = 24, z = 10 } = {}) {
+    const badge = svgIcon("new", { className: "uxl-new-badge" });
+    if (!badge) return;
+    // parentEl is already positioned (most UXL nodes are position:absolute), but be safe:
+    if (!parentEl.style.position) parentEl.style.position = "relative";
+    badge.style.position = "absolute";
+    badge.style.right = "0";
+    badge.style.bottom = "0";
+    badge.style.width = `${sizePx}px`;
+    badge.style.height = `${sizePx}px`;
+    badge.style.pointerEvents = "none";
+    badge.style.zIndex = String(z);
+    parentEl.append(badge);
+  }
+
   function drawOrthogonalRounded(svg, start, end, opts = {}) {
     const { endCircle = true, circleRadius = 4, arrowMarkerId = null, arrowStartMarkerId = null, points = null } = opts;
     const pts =
@@ -3311,11 +3378,13 @@
         pageBlock.classList.add("uxl-page--goto");
         window.setTimeout(() => pageBlock.classList.remove("uxl-page--goto"), 2400);
       });
+      // NEW badge: if page OR any child has TYPE:NEW
+      if (hasNewInTree(p)) addNewBadgeAbs(pageEl, { sizePx: 24, z: 10 });
       pageEls.set(pageKey, pageEl);
       grid.append(pageEl);
     }
 
-    const globalUids = new Set(ast.pages.filter((p) => String(p.type || "").trim().toUpperCase() === "G").map((p) => p.uid));
+    const globalUids = new Set(ast.pages.filter((p) => Array.isArray(p.types) && p.types.includes("G")).map((p) => p.uid));
 
     // Put overlay inside the grid so it shares the same coordinate space and size (like hint callouts).
     grid.append(overlay);
@@ -3632,6 +3701,8 @@
     const win = windowOverride || ast.window;
     canvas.style.width = `${win.w}px`;
     canvas.style.height = `${win.h}px`;
+    // NEW badge on canvas (main page only): if page OR any child has TYPE:NEW.
+    if (hasNewInTree(pageNode)) addNewBadgeAbs(canvas, { sizePx: 24, z: 100 });
     canvasScale.append(canvas);
     canvasWrap.append(canvasScale);
 
