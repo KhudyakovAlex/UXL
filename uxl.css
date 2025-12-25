@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700;800&display=swap");
+
 .uxl-root {
   --uxl-border: #8c959f;
   --uxl-text: #24292f;
@@ -9,7 +11,7 @@
   --uxl-hint: #d00000;
 
   color: var(--uxl-text);
-  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font: 14px/1.4 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   overflow-x: hidden;
 }
 
