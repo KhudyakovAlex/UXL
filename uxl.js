@@ -3688,11 +3688,17 @@
       // Make the wrapper's layout size match the transformed size to avoid clipping below.
       mapScale.style.width = `${Math.round(baseW * scale)}px`;
       mapScale.style.height = `${Math.round(baseH * scale)}px`;
+      // Ensure the outer wrapper participates in layout with the scaled height (prevents visual clipping).
+      mapWrap.style.height = `${Math.round(baseH * scale)}px`;
     }
 
     relayoutAndRedraw();
     window.addEventListener("resize", () => relayoutAndRedraw());
     if (window.visualViewport) window.visualViewport.addEventListener("resize", () => relayoutAndRedraw());
+    // When user scrolls, map top offset changes => recompute height-fit scale.
+    window.addEventListener("scroll", () => requestAnimationFrame(() => applyMapScaleToFitWidth()), { passive: true });
+    // Fonts/layout may settle after initial paint.
+    window.addEventListener("load", () => relayoutAndRedraw(), { once: true });
 
     return map;
   }
