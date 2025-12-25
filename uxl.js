@@ -3479,6 +3479,14 @@
       const colGap = 80;
       const rowGap = 26;
 
+      // Reserve a dedicated left column for TYPE:G pages (always visible near the tree).
+      let gColW = 0;
+      for (const uid of pagesGlobal) {
+        const s = sizes.get(uid) || { w: 160, h: 48 };
+        gColW = Math.max(gColW, s.w);
+      }
+      const normalX0 = pagesGlobal.length ? gColW + colGap : 0;
+
       const colWidths = new Map();
       for (const lvl of levels) {
         let maxW = 0;
@@ -3491,7 +3499,7 @@
 
       // X offsets
       const xOffset = new Map();
-      let x = 0;
+      let x = normalX0;
       for (const lvl of levels) {
         xOffset.set(lvl, x);
         x += (colWidths.get(lvl) || 160) + colGap;
@@ -3514,16 +3522,12 @@
         totalH = Math.max(totalH, y);
       }
 
-      // Place TYPE:G pages as a separate "bottom list" with no edges.
-      let bottomY = Math.max(0, totalH - rowGap);
-      if (pagesGlobal.length) bottomY += rowGap * 2;
-      let gMaxW = 0;
-      let yG = bottomY;
+      // Place TYPE:G pages as a separate left column with no edges.
+      let yG = 0;
       for (const uid of pagesGlobal) {
         const elp = pageEls.get(uid);
         if (!elp) continue;
         const s = sizes.get(uid) || { w: 160, h: 48 };
-        gMaxW = Math.max(gMaxW, s.w);
         elp.style.left = `0px`;
         elp.style.top = `${yG}px`;
         elp.style.width = `${s.w}px`;
@@ -3532,8 +3536,10 @@
       }
 
       const normalW = Math.max(0, x - colGap);
-      const finalW = Math.max(normalW, gMaxW);
-      const finalH = pagesGlobal.length ? Math.max(0, yG - rowGap) : Math.max(0, totalH - rowGap);
+      const finalW = Math.max(normalW, gColW);
+      const normalH = Math.max(0, totalH - rowGap);
+      const globalH = pagesGlobal.length ? Math.max(0, yG - rowGap) : 0;
+      const finalH = Math.max(normalH, globalH);
       grid.style.width = `${finalW}px`;
       grid.style.height = `${finalH}px`;
     }
