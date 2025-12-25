@@ -3665,8 +3665,17 @@
     function applyMapScaleToFitWidth() {
       const vv = window.visualViewport;
       const vw = vv ? vv.width : window.innerWidth;
+      const mobile = vw <= 900;
 
-      // Scale down (never upscale) so the map fits the available width.
+      if (!mobile) {
+        mapScale.style.transform = "";
+        mapScale.style.transformOrigin = "";
+        mapScale.style.width = "";
+        mapScale.style.height = "";
+        return;
+      }
+
+      // Scale down only (never upscale) so the map fits the available width.
       const availW = mapWrap.clientWidth || map.getBoundingClientRect().width || vw;
       const baseW = grid.offsetWidth || 1; // offsetWidth ignores transform; good for baseline
       const baseH = grid.offsetHeight || 1;
