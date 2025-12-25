@@ -10,6 +10,21 @@
   const RENDERER_VERSION = "0.2.0";
   const SUPPORTED_UXL_VERSION = "1.0";
 
+  function detectBuildIdFromScriptTag() {
+    try {
+      const scripts = Array.from(document.getElementsByTagName("script"));
+      for (const s of scripts) {
+        const src = String(s?.src || "");
+        if (!src) continue;
+        if (!/\/?uxl\.js(\?|$)/i.test(src)) continue;
+        const u = new URL(src, window.location.href);
+        const v = u.searchParams.get("v");
+        if (v) return v;
+      }
+    } catch {}
+    return "";
+  }
+
   class UxlParseError extends Error {
     constructor(message, { line = null, col = null, sourceName = "UXL", lineText = null } = {}) {
       super(message);
@@ -4331,7 +4346,9 @@
     root.append(pagesWrap);
 
     const footer = el("div", { class: "uxl-footer" });
-    const ver = el("div", { class: "uxl-footer__ver", text: `UXL ${ast.uxlVersion || SUPPORTED_UXL_VERSION} / renderer ${RENDERER_VERSION}` });
+    const build = detectBuildIdFromScriptTag();
+    const verText = `UXL ${ast.uxlVersion || SUPPORTED_UXL_VERSION} / renderer ${RENDERER_VERSION}${build ? ` / build ${build}` : ""}`;
+    const ver = el("div", { class: "uxl-footer__ver", text: verText });
     footer.append(ver);
     root.append(footer);
     return root;
