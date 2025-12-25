@@ -226,6 +226,7 @@
 .uxl-overlay--map {
   color: var(--uxl-muted);
   z-index: 2;
+  overflow: visible;
 }
 .uxl-overlay--map path,
 .uxl-overlay--map circle {
