@@ -558,6 +558,7 @@
       "menu",
       "microphone",
       "more-horizontal",
+      "new",
       "plus",
       "search",
       "sliders",
@@ -2098,6 +2099,17 @@
         { tag: "circle", attrs: { cx: "12", cy: "12", r: "2" } },
         { tag: "circle", attrs: { cx: "19", cy: "12", r: "2" } },
         { tag: "circle", attrs: { cx: "5", cy: "12", r: "2" } },
+      ],
+    },
+    new: {
+      // Provided SVG (24x24). Two-tone: red triangle (currentColor) + white strokes.
+      viewBox: "0 0 24 24",
+      els: [
+        { tag: "polygon", attrs: { points: "0 24 24 0 24 12 12 24 0 24", fill: "currentColor", stroke: "none" } },
+        { tag: "polyline", attrs: { points: "11.15 20.96 8.85 18.66 13.25 18.86 10.96 16.56", stroke: "#fff" } },
+        { tag: "polyline", attrs: { points: "14.39 13.13 12.18 15.34 14.48 17.63 16.69 15.42", stroke: "#fff" } },
+        { tag: "polyline", attrs: { points: "15.34 12.18 18.74 13.38 17.44 10.08 20.74 11.37 19.45 8.07", stroke: "#fff" } },
+        { tag: "line", attrs: { x1: "15.19", y1: "14.63", x2: "13.33", y2: "16.48", stroke: "#fff" } },
       ],
     },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
