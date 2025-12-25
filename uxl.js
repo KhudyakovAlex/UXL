@@ -2105,11 +2105,11 @@
       // Provided SVG (24x24). Two-tone: red triangle (currentColor) + white strokes.
       viewBox: "0 0 24 24",
       els: [
-        { tag: "polygon", attrs: { points: "0 24 24 0 24 12 12 24 0 24", fill: "currentColor", stroke: "none" } },
-        { tag: "polyline", attrs: { points: "11.15 20.96 8.85 18.66 13.25 18.86 10.96 16.56", stroke: "#fff" } },
-        { tag: "polyline", attrs: { points: "14.39 13.13 12.18 15.34 14.48 17.63 16.69 15.42", stroke: "#fff" } },
-        { tag: "polyline", attrs: { points: "15.34 12.18 18.74 13.38 17.44 10.08 20.74 11.37 19.45 8.07", stroke: "#fff" } },
-        { tag: "line", attrs: { x1: "15.19", y1: "14.63", x2: "13.33", y2: "16.48", stroke: "#fff" } },
+        { tag: "polygon", attrs: { points: "0 24 24 0 24 14.83 14.83 24 0 24", fill: "currentColor", stroke: "none" } },
+        { tag: "polyline", attrs: { points: "11.09 22.54 8.39 19.85 13.55 20.08 10.86 17.38", stroke: "#fff", "stroke-width": "0.5" } },
+        { tag: "polyline", attrs: { points: "14.89 13.35 12.3 15.94 14.99 18.64 17.58 16.05", stroke: "#fff", "stroke-width": "0.5" } },
+        { tag: "polyline", attrs: { points: "16 12.24 19.99 13.65 18.47 9.78 22.34 11.29 20.82 7.42", stroke: "#fff", "stroke-width": "0.5" } },
+        { tag: "line", attrs: { x1: "15.82", y1: "15.11", x2: "13.64", y2: "17.29", stroke: "#fff", "stroke-width": "0.5" } },
       ],
     },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
