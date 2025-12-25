@@ -319,8 +319,8 @@
         case "P":
           return {
             format:
-              "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, IN:<ALIGN>, IN:H|IN:V, GOTOAFTER:3, TYPE:G, HINT)",
-            example: "P\\users\\Пользователи\\TYPE:G\\GOTOAFTER:3\\IN:M12\\IN:LT\\IN:V\\Подсказка страницы",
+              "P\\CAPTION[\\...поля...] или P\\ID\\CAPTION[\\...поля...] (поля в любом порядке: IN:M10=padding, IN:<ALIGN>, IN:H|IN:V, GOTOAFTER:3, TYPE:G:NEW, HINT)",
+            example: "P\\users\\Пользователи\\TYPE:G:NEW\\GOTOAFTER:3\\IN:M12\\IN:LT\\IN:V\\Подсказка страницы",
           };
         case "F":
           return {
@@ -907,9 +907,16 @@
         }
         if (allowType && /^TYPE:/i.test(v)) {
           const m = /^TYPE:(.+)$/i.exec(v);
-          const t = String(m?.[1] || "").trim().toUpperCase();
-          if (t !== "G") throw formatError(tag, 'TYPE пока поддерживает только "TYPE:G".');
-          setOnce("type", "G");
+          const raw = String(m?.[1] || "").trim();
+          const parts = raw.split(":").map((s) => s.trim().toUpperCase()).filter(Boolean);
+          if (parts.length === 0) throw formatError(tag, 'TYPE должен содержать хотя бы одну метку (например "TYPE:G" или "TYPE:NEW" или "TYPE:G:NEW").');
+          for (const p of parts) {
+            if (p !== "G" && p !== "NEW") {
+              throw formatError(tag, `Неизвестная метка TYPE: "${p}". Поддерживаются: G (глобальная страница), NEW (бейдж "новинка").`);
+            }
+          }
+          if (typeStr) throw formatError(tag, "TYPE указан более одного раза.");
+          typeStr = parts.join(":");
           continue;
         }
         if (allowCols && isColsToken(v)) {
@@ -979,6 +986,7 @@
         }
         throw formatError(tag, `Не удалось распознать поле "${v}".`);
       }
+      const types = typeStr ? typeStr.split(":").filter(Boolean) : [];
       return {
         sizeStr,
         alignStr,
@@ -1000,7 +1008,7 @@
         colorHex,
       fontSpec,
         wrapMode,
-        typeStr,
+        types,
       };
     }
 
@@ -1055,8 +1063,8 @@
       const gotoAfterSec = rest.gotoAfterSec;
       const inAlign = rest.inAlignStr ? parseAlign(rest.inAlignStr, meta) : null;
       const inFlow = rest.inFlow || "";
-      const type = rest.typeStr || "";
-      return { indent, node: { tag, id, caption, type, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
+      const types = rest.types || [];
+      return { indent, node: { tag, id, caption, types, padding, inAlign, inFlow, gotoAfterSec, size: null, align: null, action: null, hint, rawLineNo: lineNo } };
     }
 
     if (tag === "TH" || tag === "TD") {
@@ -3357,7 +3365,7 @@
       grid.append(pageEl);
     }
 
-    const globalUids = new Set(ast.pages.filter((p) => String(p.type || "").trim().toUpperCase() === "G").map((p) => p.uid));
+    const globalUids = new Set(ast.pages.filter((p) => Array.isArray(p.types) && p.types.includes("G")).map((p) => p.uid));
 
     // Put overlay inside the grid so it shares the same coordinate space and size (like hint callouts).
     grid.append(overlay);
