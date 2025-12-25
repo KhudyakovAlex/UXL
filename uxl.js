@@ -4313,6 +4313,60 @@
     };
   }
 
+  function parsePHash() {
+    const raw = String(window.location.hash || "").replace(/^#/, "");
+    const m = /^P:(.+)$/i.exec(raw.trim());
+    const id = String(m?.[1] || "").trim();
+    return id ? id : null;
+  }
+
+  function scrollToPageUidInRoot(root, pageUid) {
+    const pageEl = root?.querySelector?.(`.uxl-page[data-page-uid="${CSS.escape(pageUid)}"]`);
+    const headEl = pageEl?.querySelector?.(".uxl-page__head") || pageEl;
+    if (!headEl) return false;
+    const targetTop = headEl.getBoundingClientRect().top + window.pageYOffset - 100;
+    window.scrollTo({ top: targetTop, behavior: "smooth" });
+    if (pageEl) {
+      pageEl.classList.remove("uxl-page--goto");
+      void pageEl.offsetWidth;
+      pageEl.classList.add("uxl-page--goto");
+      window.setTimeout(() => pageEl.classList.remove("uxl-page--goto"), 2400);
+    }
+    return true;
+  }
+
+  function tryHandlePHashForRoot(root, ast) {
+    const id = parsePHash();
+    if (!id) return false;
+    const key = normalizeId(id);
+    const uid = ast?.pageIdToUid?.[key];
+    if (!uid) return false;
+    return scrollToPageUidInRoot(root, uid);
+  }
+
+  function registerHashNavigation(root, ast) {
+    if (!root || !ast) return;
+    if (!window.__uxlHashNav) window.__uxlHashNav = { items: [], installed: false, onChange: null };
+    const hub = window.__uxlHashNav;
+    hub.items.push({ root, ast });
+
+    if (!hub.installed) {
+      hub.installed = true;
+      hub.onChange = () => {
+        // Try the most recently rendered roots first.
+        for (let i = hub.items.length - 1; i >= 0; i--) {
+          const it = hub.items[i];
+          if (!document.contains(it.root)) continue;
+          if (tryHandlePHashForRoot(it.root, it.ast)) break;
+        }
+      };
+      window.addEventListener("hashchange", hub.onChange);
+    }
+
+    // Initial attempt (after DOM insertion + layout).
+    requestAnimationFrame(() => requestAnimationFrame(() => tryHandlePHashForRoot(root, ast)));
+  }
+
   function renderAst(ast, { uxlText = "", mode = "permissive", pageInterleaves = null } = {}) {
     const root = el("div", { class: "uxl-root" });
     const proto = el("div", { class: "uxl-proto-preview" });
@@ -4350,6 +4404,7 @@
     const ver = el("div", { class: "uxl-footer__ver", text: `UXL ${ast.uxlVersion || SUPPORTED_UXL_VERSION} / renderer ${RENDERER_VERSION}` });
     footer.append(ver);
     root.append(footer);
+    registerHashNavigation(root, ast);
     return root;
   }
 
