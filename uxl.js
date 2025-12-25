@@ -3558,7 +3558,6 @@
       // IMPORTANT: Use untransformed sizes/coords so arrows remain correct under CSS scaling.
       const baseW = Math.round(grid.offsetWidth);
       const baseH = Math.round(grid.offsetHeight);
-      overlay.setAttribute("overflow", "visible");
       overlay.setAttribute("viewBox", `0 0 ${baseW} ${baseH}`);
       overlay.setAttribute("width", String(baseW));
       overlay.setAttribute("height", String(baseH));
