@@ -3311,8 +3311,15 @@
   function addNewBadgeAbs(parentEl, { sizePx = 36, z = 10 } = {}) {
     const badge = svgIcon("new", { className: "uxl-new-badge" });
     if (!badge) return;
-    // parentEl is already positioned (most UXL nodes are position:absolute), but be safe:
-    if (!parentEl.style.position) parentEl.style.position = "relative";
+    // parentEl is usually already positioned via CSS (e.g. map tiles are position:absolute).
+    // Do NOT override it based on inline styles. Only set relative if it is actually static.
+    try {
+      const pos = window.getComputedStyle(parentEl).position;
+      if (!pos || pos === "static") parentEl.style.position = "relative";
+    } catch {
+      // Fallback: keep previous behavior only if no inline position is set.
+      if (!parentEl.style.position) parentEl.style.position = "relative";
+    }
     badge.style.position = "absolute";
     badge.style.right = "0";
     badge.style.bottom = "0";
