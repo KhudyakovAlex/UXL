@@ -3667,21 +3667,25 @@
       const vw = vv ? vv.width : window.innerWidth;
       const vh = vv ? vv.height : window.innerHeight;
 
-      // Scale down (never upscale) so the map fits available width AND height.
-      const availW = mapWrap.clientWidth || map.getBoundingClientRect().width || vw;
+      // Scale down (never upscale) so the map fits the CURRENT viewport area.
+      // Important: fit by BOTH width and height, and compute available height from the map's top edge.
+      const wrapRect = mapWrap.getBoundingClientRect();
+      const topInViewport = Math.max(0, wrapRect.top);
+
       const baseW = grid.offsetWidth || 1; // offsetWidth ignores transform; good for baseline
       const baseH = grid.offsetHeight || 1;
       const pad = 8;
-      // Reserve some height for the rest of the page (title, padding, etc.)
-      const reservedH = 200;
-      const availH = Math.max(100, vh - reservedH);
-      const scaleW = (availW - pad * 2) / baseW;
-      const scaleH = (availH - pad * 2) / baseH;
+
+      const availW = (mapWrap.clientWidth || wrapRect.width || vw) - pad * 2;
+      const availH = Math.max(120, vh - topInViewport - pad * 2);
+
+      const scaleW = availW / baseW;
+      const scaleH = availH / baseH;
       const scale = Math.max(0.1, Math.min(1, scaleW, scaleH));
 
       mapScale.style.transformOrigin = "top left";
       mapScale.style.transform = `scale(${scale})`;
-      // Make the wrapper's layout size match the transformed size to avoid extra overflow/blank space.
+      // Make the wrapper's layout size match the transformed size to avoid clipping below.
       mapScale.style.width = `${Math.round(baseW * scale)}px`;
       mapScale.style.height = `${Math.round(baseH * scale)}px`;
     }
