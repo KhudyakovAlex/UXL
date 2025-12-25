@@ -3767,7 +3767,12 @@
     // P link icon: copy full URL with #P:<id> and scroll to this page (like map click).
     const pageId = String(pageNode.id || "").trim();
     if (pageId) {
-      const linkBtn = el("button", { class: "uxl-page__link", type: "button", "aria-label": "Copy link to this page" });
+      const linkBtn = el("button", {
+        class: "uxl-page__link",
+        type: "button",
+        title: "Копировать ссылку на страницу",
+        "aria-label": "Копировать ссылку на страницу",
+      });
       const ico = svgIcon("link", { className: "uxl-page__link-ico" });
       if (ico) linkBtn.append(ico);
       linkBtn.addEventListener("click", async (ev) => {
@@ -3784,7 +3789,12 @@
         }
         scrollToThisPage();
       });
-      const menuBtn = el("button", { class: "uxl-page__link", type: "button", "aria-label": "Go to interface map" });
+      const menuBtn = el("button", {
+        class: "uxl-page__link",
+        type: "button",
+        title: "Перейти к карте интерфейса",
+        "aria-label": "Перейти к карте интерфейса",
+      });
       const menuIco = svgIcon("menu", { className: "uxl-page__link-ico" });
       if (menuIco) menuBtn.append(menuIco);
       menuBtn.addEventListener("click", (ev) => {
