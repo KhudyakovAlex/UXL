@@ -2122,14 +2122,14 @@
       ],
     },
     new: {
-      // Provided SVG (24x24). Two-tone: red diagonal (#c90000) + white strokes.
+      // Provided SVG (24x24). Two-tone: red diagonal (#ee0000) + white strokes (0.75px).
       viewBox: "0 0 24 24",
       els: [
-        { tag: "polygon", attrs: { points: "0 24 24 0 24 14.83 14.83 24 0 24", fill: "#c90000", stroke: "none" } },
-        { tag: "polyline", attrs: { points: "11.09 22.54 8.39 19.85 13.55 20.08 10.86 17.38", stroke: "#fff", "stroke-width": "0.5" } },
-        { tag: "polyline", attrs: { points: "14.89 13.35 12.3 15.94 14.99 18.64 17.58 16.05", stroke: "#fff", "stroke-width": "0.5" } },
-        { tag: "polyline", attrs: { points: "16 12.24 19.99 13.65 18.47 9.78 22.34 11.29 20.82 7.42", stroke: "#fff", "stroke-width": "0.5" } },
-        { tag: "line", attrs: { x1: "15.82", y1: "15.11", x2: "13.64", y2: "17.29", stroke: "#fff", "stroke-width": "0.5" } },
+        { tag: "polygon", attrs: { points: "0 24 24 0 24 14.83 14.83 24 0 24", fill: "#ee0000", stroke: "none" } },
+        { tag: "polyline", attrs: { points: "11.09 22.54 8.39 19.85 13.55 20.08 10.86 17.38", stroke: "#fff", "stroke-width": "0.75" } },
+        { tag: "polyline", attrs: { points: "14.89 13.35 12.3 15.94 14.99 18.64 17.58 16.05", stroke: "#fff", "stroke-width": "0.75" } },
+        { tag: "polyline", attrs: { points: "16 12.24 19.99 13.65 18.47 9.78 22.34 11.29 20.82 7.42", stroke: "#fff", "stroke-width": "0.75" } },
+        { tag: "line", attrs: { x1: "15.82", y1: "15.11", x2: "13.64", y2: "17.29", stroke: "#fff", "stroke-width": "0.75" } },
       ],
     },
     plus: { viewBox: "0 0 24 24", d: ["M12 5v14", "M5 12h14"] },
