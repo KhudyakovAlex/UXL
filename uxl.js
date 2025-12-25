@@ -2122,10 +2122,10 @@
       ],
     },
     new: {
-      // Provided SVG (24x24). Two-tone: red triangle (currentColor) + white strokes.
+      // Provided SVG (24x24). Two-tone: red diagonal (#c90000) + white strokes.
       viewBox: "0 0 24 24",
       els: [
-        { tag: "polygon", attrs: { points: "0 24 24 0 24 14.83 14.83 24 0 24", fill: "currentColor", stroke: "none" } },
+        { tag: "polygon", attrs: { points: "0 24 24 0 24 14.83 14.83 24 0 24", fill: "#c90000", stroke: "none" } },
         { tag: "polyline", attrs: { points: "11.09 22.54 8.39 19.85 13.55 20.08 10.86 17.38", stroke: "#fff", "stroke-width": "0.5" } },
         { tag: "polyline", attrs: { points: "14.89 13.35 12.3 15.94 14.99 18.64 17.58 16.05", stroke: "#fff", "stroke-width": "0.5" } },
         { tag: "polyline", attrs: { points: "16 12.24 19.99 13.65 18.47 9.78 22.34 11.29 20.82 7.42", stroke: "#fff", "stroke-width": "0.5" } },
@@ -2550,7 +2550,7 @@
       if (node.hint) nodeEl.title = node.hint;
       if ((tag === "C" || tag === "B") && Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
       
-      // TYPE:NEW badge (icon "new": red diagonal + white strokes, 24x24px)
+      // TYPE:NEW badge (icon "new": red diagonal + white strokes, 36x36px)
       if (Array.isArray(node.types) && node.types.includes("NEW")) {
         nodeEl.style.position = "relative";
         const badge = svgIcon("new", { className: "uxl-new-badge" });
@@ -2558,8 +2558,8 @@
           badge.style.position = "absolute";
           badge.style.right = "0";
           badge.style.bottom = "0";
-          badge.style.width = "24px";
-          badge.style.height = "24px";
+          badge.style.width = "36px";
+          badge.style.height = "36px";
           badge.style.pointerEvents = "none";
           badge.style.zIndex = "10";
           nodeEl.append(badge);
@@ -3378,8 +3378,8 @@
           badge.style.position = "absolute";
           badge.style.right = "0";
           badge.style.bottom = "0";
-          badge.style.width = "24px";
-          badge.style.height = "24px";
+          badge.style.width = "36px";
+          badge.style.height = "36px";
           badge.style.pointerEvents = "none";
           badge.style.zIndex = "10";
           pageEl.append(badge);
@@ -3716,8 +3716,8 @@
         badge.style.position = "absolute";
         badge.style.right = "0";
         badge.style.bottom = "0";
-        badge.style.width = "24px";
-        badge.style.height = "24px";
+        badge.style.width = "36px";
+        badge.style.height = "36px";
         badge.style.pointerEvents = "none";
         badge.style.zIndex = "100";
         canvas.append(badge);
