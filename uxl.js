@@ -1121,7 +1121,6 @@
         allowIcon: true,
         allowColor: true,
         allowWrap: true,
-        allowType: true,
       });
       if (!String(caption).trim() && !String(rest.iconName || "").trim()) {
         throw formatError("B", 'Нужен CAPTION или ICON:... (например "B\\Кнопка" или "B\\ICON:home").');
@@ -1144,7 +1143,6 @@
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           wrap: rest.wrapMode || "",
-          types: rest.types || [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1164,7 +1162,6 @@
         allowColor: true,
         allowFont: true,
         allowWrap: true,
-        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1183,7 +1180,6 @@
           color: rest.colorHex || "",
           font: rest.fontSpec ? { ...rest.fontSpec } : null,
           wrap: rest.wrapMode || "",
-          types: rest.types || [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1202,7 +1198,6 @@
         allowFit: false,
         allowBg: true,
         allowColor: true,
-        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1223,7 +1218,6 @@
           inFlow,
           bg,
           bgColor,
-          types: rest.types || [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1318,7 +1312,6 @@
         allowMargin: true,
         allowColor: true,
         allowWrap: true,
-        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1334,7 +1327,6 @@
           margin: rest.marginPx ?? 3,
           color: rest.colorHex || "",
           wrap: rest.wrapMode || "",
-          types: rest.types || [],
           ...common,
           rawLineNo: lineNo,
         },
@@ -1383,7 +1375,6 @@
         allowFit: true,
         allowBg: false,
         allowColor: true,
-        allowType: true,
       });
       let src = String(rest.srcUrl || "").trim();
       let icon = String(rest.iconName || "").trim().toLowerCase();
@@ -1419,7 +1410,6 @@
           margin: rest.marginPx ?? 0,
           radius: rest.radiusPx ?? 0,
           color: rest.colorHex || "",
-          types: rest.types || [],
           ...common,
         rawLineNo: lineNo,
       },
@@ -1437,7 +1427,6 @@
         allowInAlign: true,
         allowColor: true,
         allowWrap: true,
-        allowType: true,
       });
       const sizeStr = rest.sizeStr;
       const alignStr = rest.alignStr;
@@ -1454,12 +1443,11 @@
           textAlign: rest.textAlignStr || "",
           color: rest.colorHex || "",
           wrap: rest.wrapMode || "",
-          types: rest.types || [],
           ...common,
         rawLineNo: lineNo,
       },
     };
-  }
+    }
 
     throw new UxlParseError(
       `Неизвестный тег: "${tag}". Разрешены: P, F, I, B, C, S, T, TH, TD. См. UXL.md для форматов.`,
@@ -2541,24 +2529,6 @@
 
       if (node.hint) nodeEl.title = node.hint;
       if ((tag === "C" || tag === "B") && Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
-      
-      // TYPE:NEW badge (red background + white "new" icon in bottom-right corner)
-      if (Array.isArray(node.types) && node.types.includes("NEW")) {
-        nodeEl.style.position = "relative";
-        const badge = svgIcon("new", { className: "uxl-new-badge" });
-        if (badge) {
-          badge.style.position = "absolute";
-          badge.style.right = "0";
-          badge.style.bottom = "0";
-          badge.style.width = "16px";
-          badge.style.height = "16px";
-          badge.style.backgroundColor = "#c90000";
-          badge.style.pointerEvents = "none";
-          badge.style.zIndex = "10";
-          nodeEl.append(badge);
-        }
-      }
-      
       domByUid.set(node.uid, nodeEl);
       parentEl.append(nodeEl);
 
