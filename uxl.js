@@ -3357,6 +3357,7 @@
 
   function renderMap(ast) {
     const map = el("div", { class: "uxl-map" });
+    map.id = "uxl-map";
     const mapWrap = el("div", { class: "uxl-map-wrap" });
     const mapScale = el("div", { class: "uxl-map-scale" });
     const grid = el("div", { class: "uxl-map__grid" });
@@ -3479,13 +3480,13 @@
       const colGap = 80;
       const rowGap = 26;
 
-      // Reserve a dedicated left column for TYPE:G pages (always visible near the tree).
+      // Reserve a dedicated right column for TYPE:G pages (always visible near the tree).
       let gColW = 0;
       for (const uid of pagesGlobal) {
         const s = sizes.get(uid) || { w: 160, h: 48 };
         gColW = Math.max(gColW, s.w);
       }
-      const normalX0 = pagesGlobal.length ? gColW + colGap : 0;
+      const normalX0 = 0;
 
       const colWidths = new Map();
       for (const lvl of levels) {
@@ -3522,21 +3523,22 @@
         totalH = Math.max(totalH, y);
       }
 
-      // Place TYPE:G pages as a separate left column with no edges.
+      // Place TYPE:G pages as a separate right column with no edges.
+      const normalW = Math.max(0, x - colGap);
+      const gX = pagesGlobal.length ? normalW + colGap : 0;
       let yG = 0;
       for (const uid of pagesGlobal) {
         const elp = pageEls.get(uid);
         if (!elp) continue;
         const s = sizes.get(uid) || { w: 160, h: 48 };
-        elp.style.left = `0px`;
+        elp.style.left = `${gX}px`;
         elp.style.top = `${yG}px`;
         elp.style.width = `${s.w}px`;
         elp.style.height = `${s.h}px`;
         yG += s.h + rowGap;
       }
 
-      const normalW = Math.max(0, x - colGap);
-      const finalW = Math.max(normalW, gColW);
+      const finalW = pagesGlobal.length ? Math.max(normalW, gX + gColW) : normalW;
       const normalH = Math.max(0, totalH - rowGap);
       const globalH = pagesGlobal.length ? Math.max(0, yG - rowGap) : 0;
       const finalH = Math.max(normalH, globalH);
@@ -3743,6 +3745,19 @@
       window.setTimeout(() => page.classList.remove("uxl-page--goto"), 2400);
     }
 
+    function scrollToMap() {
+      const root = page.closest(".uxl-root") || document;
+      const mapEl = root.querySelector("#uxl-map") || root.querySelector(".uxl-map");
+      if (!mapEl) return;
+      const titleEl = root.querySelector(".uxl-map__title") || mapEl;
+      const targetTop = titleEl.getBoundingClientRect().top + window.pageYOffset - 20;
+      window.scrollTo({ top: targetTop, behavior: "smooth" });
+      mapEl.classList.remove("uxl-map--goto");
+      void mapEl.offsetWidth;
+      mapEl.classList.add("uxl-map--goto");
+      window.setTimeout(() => mapEl.classList.remove("uxl-map--goto"), 2200);
+    }
+
     // P link icon: copy full URL with #P:<id> and scroll to this page (like map click).
     const pageId = String(pageNode.id || "").trim();
     if (pageId) {
@@ -3763,7 +3778,15 @@
         }
         scrollToThisPage();
       });
-      head.append(linkBtn);
+      const menuBtn = el("button", { class: "uxl-page__link", type: "button", "aria-label": "Go to interface map" });
+      const menuIco = svgIcon("menu", { className: "uxl-page__link-ico" });
+      if (menuIco) menuBtn.append(menuIco);
+      menuBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        scrollToMap();
+      });
+      head.append(linkBtn, menuBtn);
     }
 
     // Render nodes; layout will run on next animation frame (after DOM insertion).

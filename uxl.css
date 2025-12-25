@@ -311,6 +311,10 @@
   100% { border-color: var(--uxl-border); box-shadow: none; }
 }
 
+.uxl-map--goto .uxl-map__grid {
+  animation: uxl-goto-canvas 2.2s ease-out;
+}
+
 .uxl-page--goto .uxl-page__head {
   /* Title: color only (no border/outline) */
   animation: uxl-goto-title 2.2s ease-out;
