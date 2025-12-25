@@ -262,6 +262,34 @@
 .uxl-page__head {
   padding: 6px 0 10px;
   font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.uxl-page__head-title {
+  min-width: 0;
+}
+
+.uxl-page__link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--uxl-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+.uxl-page__link:hover {
+  color: var(--uxl-text);
+}
+.uxl-page__link-ico {
+  width: 18px;
+  height: 18px;
 }
 
 @keyframes uxl-goto-title {

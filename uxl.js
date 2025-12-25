@@ -3702,7 +3702,9 @@
   function renderPageSection(ast, pageNode, { windowOverride = null } = {}) {
     const page = el("div", { class: "uxl-page", "data-page-uid": pageNode.uid });
     const headText = pageLabel(pageNode);
-    const head = el("div", { class: "uxl-page__head", text: headText });
+    const head = el("div", { class: "uxl-page__head" });
+    const headTitle = el("span", { class: "uxl-page__head-title", text: headText });
+    head.append(headTitle);
     const body = el("div", { class: "uxl-page__body" });
     const canvasWrap = el("div", { class: "uxl-canvas-wrap" });
     const canvasScale = el("div", { class: "uxl-canvas-scale" });
@@ -3724,6 +3726,39 @@
     overlay.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     body.append(canvasWrap, hints, overlay);
     page.append(head, body);
+
+    function scrollToThisPage() {
+      const headEl = page.querySelector(".uxl-page__head") || page;
+      const targetTop = headEl.getBoundingClientRect().top + window.pageYOffset - 100;
+      window.scrollTo({ top: targetTop, behavior: "smooth" });
+      page.classList.remove("uxl-page--goto");
+      void page.offsetWidth;
+      page.classList.add("uxl-page--goto");
+      window.setTimeout(() => page.classList.remove("uxl-page--goto"), 2400);
+    }
+
+    // P link icon: copy full URL with #P:<id> and scroll to this page (like map click).
+    const pageId = String(pageNode.id || "").trim();
+    if (pageId) {
+      const linkBtn = el("button", { class: "uxl-page__link", type: "button", "aria-label": "Copy link to this page" });
+      const ico = svgIcon("link", { className: "uxl-page__link-ico" });
+      if (ico) linkBtn.append(ico);
+      linkBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const url = new URL(window.location.href);
+        url.hash = `P:${pageId}`;
+        const text = url.toString();
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          // Fallback for insecure contexts / permissions.
+          window.prompt("Copy link:", text);
+        }
+        scrollToThisPage();
+      });
+      head.append(linkBtn);
+    }
 
     // Render nodes; layout will run on next animation frame (after DOM insertion).
     const domByUid = layoutTree(canvas, pageNode, win);
