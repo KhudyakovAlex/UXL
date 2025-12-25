@@ -2368,7 +2368,7 @@
         domByUid.set(node.uid, nodeEl);
         parentEl.append(nodeEl);
         for (const ch of node.children || []) renderNode(ch, nodeEl);
-        if (Array.isArray(node.types) && node.types.includes("NEW")) addNewBadgeAbs(nodeEl, { sizePx: 24, z: 50 });
+        if (Array.isArray(node.types) && node.types.includes("NEW")) addNewBadgeAbs(nodeEl, { sizePx: 36, z: 50 });
         return nodeEl;
       }
 
@@ -2560,7 +2560,7 @@
 
       if (node.hint) nodeEl.title = node.hint;
       if ((tag === "C" || tag === "B") && Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
-      if (Array.isArray(node.types) && node.types.includes("NEW")) addNewBadgeAbs(nodeEl, { sizePx: 24, z: 50 });
+      if (Array.isArray(node.types) && node.types.includes("NEW")) addNewBadgeAbs(nodeEl, { sizePx: 36, z: 50 });
       domByUid.set(node.uid, nodeEl);
       parentEl.append(nodeEl);
 
@@ -3299,7 +3299,7 @@
     return false;
   }
 
-  function addNewBadgeAbs(parentEl, { sizePx = 24, z = 10 } = {}) {
+  function addNewBadgeAbs(parentEl, { sizePx = 36, z = 10 } = {}) {
     const badge = svgIcon("new", { className: "uxl-new-badge" });
     if (!badge) return;
     // parentEl is already positioned (most UXL nodes are position:absolute), but be safe:
@@ -3379,7 +3379,7 @@
         window.setTimeout(() => pageBlock.classList.remove("uxl-page--goto"), 2400);
       });
       // NEW badge: if page OR any child has TYPE:NEW
-      if (hasNewInTree(p)) addNewBadgeAbs(pageEl, { sizePx: 24, z: 10 });
+      if (hasNewInTree(p)) addNewBadgeAbs(pageEl, { sizePx: 36, z: 10 });
       pageEls.set(pageKey, pageEl);
       grid.append(pageEl);
     }
@@ -3702,7 +3702,7 @@
     canvas.style.width = `${win.w}px`;
     canvas.style.height = `${win.h}px`;
     // NEW badge on canvas (main page only): if page OR any child has TYPE:NEW.
-    if (hasNewInTree(pageNode)) addNewBadgeAbs(canvas, { sizePx: 24, z: 100 });
+    if (hasNewInTree(pageNode)) addNewBadgeAbs(canvas, { sizePx: 36, z: 100 });
     canvasScale.append(canvas);
     canvasWrap.append(canvasScale);
 
