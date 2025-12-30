@@ -343,8 +343,8 @@
           };
         case "F":
           return {
-            format: 'F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/IN:H|IN:V/#RRGGBB/BG:"<url>"/HINT...] (поля в любом порядке)',
-            example: 'F\\100%x\\T\\IN:M12\\IN:H\\BG:"src/yarmap.PNG"\\#f0f0f0\\Контейнер',
+            format: 'F\\[SIZE/ALIGN/IN:M10/IN:<ALIGN>/IN:H|IN:V/R<number>/#RRGGBB/BG:"<url>"/HINT...] (поля в любом порядке)',
+            example: 'F\\100%x\\T\\IN:M12\\IN:H\\R12\\BG:"src/yarmap.PNG"\\#f0f0f0\\Контейнер',
           };
         case "I":
           return {
@@ -1240,6 +1240,7 @@
         allowFit: false,
         allowBg: true,
         allowColor: true,
+        allowRadius: true,
         allowType: true,
       });
       const sizeStr = rest.sizeStr;
@@ -1257,6 +1258,7 @@
           id: "",
           padding: rest.paddingPx ?? 0,
           margin: rest.marginPx ?? 0,
+          radius: rest.radiusPx ?? 0,
           inAlign,
           inFlow,
           bg,
@@ -2384,6 +2386,7 @@
         nodeEl = el("div", { class: "uxl-node uxl-F", "data-uxl-uid": node.uid });
         if (node.hint) nodeEl.title = node.hint;
         if (Number.isFinite(node.padding)) nodeEl.style.padding = `${node.padding}px`;
+        if (Number.isFinite(node.radius) && node.radius > 0) nodeEl.style.borderRadius = `${node.radius}px`;
         const bgColor = String(node.bgColor || "").trim();
         if (bgColor) nodeEl.style.backgroundColor = bgColor;
         const bg = String(node.bg || "").trim();
