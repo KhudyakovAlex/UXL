@@ -202,6 +202,25 @@
     return { size: { w: 500, h: 500, overflowW: null, overflowH: null }, nextIndex: lines.length };
   }
 
+  function parseStrokeIfPresent(lines, startIndex, sourceName) {
+    // Optional debug directive.
+    // Must be the first significant line after window size
+    // (or the first significant line if window size is omitted).
+    // Format: STROKE: ALL | STROKE: F (case-insensitive).
+    for (let i = startIndex; i < lines.length; i++) {
+      const rawLine = lines[i];
+      if (isBlankOrComment(rawLine)) continue;
+      const meta = { line: i + 1, col: 1, sourceName, lineText: rawLine };
+      assertNoTabs(rawLine, meta);
+      const s = rawLine.trim();
+      const m = /^STROKE\s*:\s*(ALL|F)\s*$/i.exec(s);
+      if (!m) return { stroke: null, nextIndex: i };
+      const v = String(m[1] || "").trim().toUpperCase();
+      return { stroke: v === "F" ? "F" : "ALL", nextIndex: i + 1 };
+    }
+    return { stroke: null, nextIndex: lines.length };
+  }
+
   function parseDim(raw, meta, { allowPercent = true, allowOverflow = true } = {}) {
     // Axis syntax: number[%][C|S]
     // Overflow suffix requires explicit number (no "Cx").
@@ -1545,13 +1564,14 @@
     }
     const uxlVersion = uxlVersionRaw || SUPPORTED_UXL_VERSION;
     const { size: windowSize, nextIndex } = parseWindowSizeIfPresent(lines, afterVersion, sourceName, mode);
+    const { stroke: debugStroke, nextIndex: afterStroke } = parseStrokeIfPresent(lines, nextIndex, sourceName);
 
     const stack = []; // {indent, node}
     const roots = [];
     let prevIndent = 0;
     let firstTagSeen = false;
 
-    for (let i = nextIndex; i < lines.length; i++) {
+    for (let i = afterStroke; i < lines.length; i++) {
       const rawLine = lines[i];
       if (isBlankOrComment(rawLine)) continue;
       const lineNo = i + 1;
@@ -1888,6 +1908,7 @@
       sourceName,
       uxlVersion,
       window: windowSize,
+      debug: { stroke: debugStroke },
       pages,
       edges: Array.from(edges.values()),
       pageIdToUid: (() => {
@@ -4198,6 +4219,9 @@
     const root = el("div", {
       class: view === "fullscreen" ? "uxl-root uxl-proto-root uxl-proto-root--fullscreen" : "uxl-root uxl-proto-root",
     });
+    const stroke = String(ast?.debug?.stroke || "").trim().toUpperCase();
+    if (stroke === "ALL") root.classList.add("uxl-stroke-all");
+    else if (stroke === "F") root.classList.add("uxl-stroke-f");
     const frame = el("div", { class: "uxl-proto-frame" });
     const canvas = el("div", { class: "uxl-canvas" });
     let win = view === "fullscreen" ? getViewportWindowSize({ pad: 0 }) : ast.window;
@@ -4414,6 +4438,9 @@
 
   function renderAst(ast, { uxlText = "", mode = "permissive", pageInterleaves = null } = {}) {
     const root = el("div", { class: "uxl-root" });
+    const stroke = String(ast?.debug?.stroke || "").trim().toUpperCase();
+    if (stroke === "ALL") root.classList.add("uxl-stroke-all");
+    else if (stroke === "F") root.classList.add("uxl-stroke-f");
     const proto = el("div", { class: "uxl-proto-preview" });
     proto.append(el("div", { class: "uxl-map__title", text: "Превью прототипа" }));
     const toolbar = el("div", { class: "uxl-toolbar" });
@@ -4461,9 +4488,10 @@
     const masked = [...lines];
     const htmlSegs = []; // {startLineNo,endLineNo,html}
 
-      const TAG_RE = /^\s*(P|F|I|B|C|S|T|TH|TD)(\\|$)/i;
+    const TAG_RE = /^\s*(P|F|I|B|C|S|T|TH|TD)(\\|$)/i;
     const WINDOW_RE = /^\s*\d+\s*x\s*\d+\s*([CS]\s*)?([CS]\s*)?$/i;
     const VERSION_RE = /^\s*UXL\s*:\s*/i;
+    const STROKE_RE = /^\s*STROKE\s*:\s*(ALL|F)\s*$/i;
 
     let cur = null; // {start,end,parts:[]}
     const flush = () => {
@@ -4482,7 +4510,8 @@
       const isTag = TAG_RE.test(raw);
       const isWindow = WINDOW_RE.test(raw);
       const isVersion = VERSION_RE.test(raw);
-      const isUxl = isBlank || isComment || isTag || isWindow || isVersion;
+      const isStroke = STROKE_RE.test(raw);
+      const isUxl = isBlank || isComment || isTag || isWindow || isVersion || isStroke;
 
       if (isUxl) {
         flush();

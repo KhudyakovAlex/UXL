@@ -457,6 +457,17 @@
   position: absolute;
 }
 
+/* Debug: element stroke (does NOT affect layout) */
+.uxl-root.uxl-stroke-all .uxl-node {
+  outline: 1px solid #00ff00;
+  outline-offset: -1px;
+}
+
+.uxl-root.uxl-stroke-f .uxl-F {
+  outline: 1px solid #00ff00;
+  outline-offset: -1px;
+}
+
 .uxl-F {
   border: 0;
   background: transparent;
