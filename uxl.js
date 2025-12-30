@@ -2119,18 +2119,18 @@
             .uxl-grid3x3-dot {
               transform-box: fill-box;
               transform-origin: center;
-              animation: uxl-grid3x3-pulse 1.8s ease-in-out infinite;
+              animation: uxl-grid3x3-pulse 5.4s ease-in-out infinite;
             }
             /* Phase permutation (0..8) to look less "in-order": 0,5,2,8,1,6,3,7,4 */
             .uxl-grid3x3-dot--p0 { animation-delay: 0s; }
-            .uxl-grid3x3-dot--p1 { animation-delay: -0.2s; }
-            .uxl-grid3x3-dot--p2 { animation-delay: -0.4s; }
-            .uxl-grid3x3-dot--p3 { animation-delay: -0.6s; }
-            .uxl-grid3x3-dot--p4 { animation-delay: -0.8s; }
-            .uxl-grid3x3-dot--p5 { animation-delay: -1.0s; }
-            .uxl-grid3x3-dot--p6 { animation-delay: -1.2s; }
-            .uxl-grid3x3-dot--p7 { animation-delay: -1.4s; }
-            .uxl-grid3x3-dot--p8 { animation-delay: -1.6s; }
+            .uxl-grid3x3-dot--p1 { animation-delay: -0.6s; }
+            .uxl-grid3x3-dot--p2 { animation-delay: -1.2s; }
+            .uxl-grid3x3-dot--p3 { animation-delay: -1.8s; }
+            .uxl-grid3x3-dot--p4 { animation-delay: -2.4s; }
+            .uxl-grid3x3-dot--p5 { animation-delay: -3.0s; }
+            .uxl-grid3x3-dot--p6 { animation-delay: -3.6s; }
+            .uxl-grid3x3-dot--p7 { animation-delay: -4.2s; }
+            .uxl-grid3x3-dot--p8 { animation-delay: -4.8s; }
           `.trim(),
         },
         // Dot positions match grid3x3, phases are assigned in a "chaotic" order.
