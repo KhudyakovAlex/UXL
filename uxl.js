@@ -2856,7 +2856,11 @@
               if (n.size?.[axis]?.unit === "%") return acc;
               return acc + (sz1.get(n.uid)?.[axis] || 0);
             }, 0);
-            const remaining = Math.max(0, availForGroup - fixedSum);
+            // IMPORTANT:
+            // - On the "shared" axis (stacking axis), percent sizes compete for the same free space => subtract fixed siblings.
+            // - On the "independent" axis, siblings do NOT compete => do NOT subtract fixed siblings.
+            //   This matches expected behavior like: multiple TOP elements can each be 100% width without shrinking each other.
+            const remaining = isSharedAxis ? Math.max(0, availForGroup - fixedSum) : Math.max(0, availForGroup);
 
             if (!isSharedAxis) {
               // Independent: each element gets its own percent of the available space.
