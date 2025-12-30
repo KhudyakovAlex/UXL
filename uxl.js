@@ -571,6 +571,7 @@
       "grid",
       "grid1x1",
       "grid3x3",
+      "grid3x3-anim",
       "grid4x4",
       "home",
       "link",
@@ -2101,6 +2102,49 @@
         { tag: "circle", attrs: { cx: "18", cy: "18", r: "1.6" } },
       ],
     },
+    "grid3x3-anim": {
+      viewBox: "0 0 24 24",
+      mode: "fill",
+      els: [
+        // Animated 3x3 dot grid (no external assets). "Chaotic" pulse order via a fixed permutation of phases.
+        {
+          tag: "style",
+          text: `
+            @keyframes uxl-grid3x3-pulse {
+              0%, 7%   { transform: scale(1);   opacity: 0.55; }
+              12%      { transform: scale(1.9); opacity: 1; }
+              22%      { transform: scale(1);   opacity: 0.55; }
+              100%     { transform: scale(1);   opacity: 0.55; }
+            }
+            .uxl-grid3x3-dot {
+              transform-box: fill-box;
+              transform-origin: center;
+              animation: uxl-grid3x3-pulse 1.8s ease-in-out infinite;
+            }
+            /* Phase permutation (0..8) to look less "in-order": 0,5,2,8,1,6,3,7,4 */
+            .uxl-grid3x3-dot--p0 { animation-delay: 0s; }
+            .uxl-grid3x3-dot--p1 { animation-delay: -0.2s; }
+            .uxl-grid3x3-dot--p2 { animation-delay: -0.4s; }
+            .uxl-grid3x3-dot--p3 { animation-delay: -0.6s; }
+            .uxl-grid3x3-dot--p4 { animation-delay: -0.8s; }
+            .uxl-grid3x3-dot--p5 { animation-delay: -1.0s; }
+            .uxl-grid3x3-dot--p6 { animation-delay: -1.2s; }
+            .uxl-grid3x3-dot--p7 { animation-delay: -1.4s; }
+            .uxl-grid3x3-dot--p8 { animation-delay: -1.6s; }
+          `.trim(),
+        },
+        // Dot positions match grid3x3, phases are assigned in a "chaotic" order.
+        { tag: "circle", attrs: { cx: "6", cy: "6", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p0" } },
+        { tag: "circle", attrs: { cx: "12", cy: "6", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p5" } },
+        { tag: "circle", attrs: { cx: "18", cy: "6", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p2" } },
+        { tag: "circle", attrs: { cx: "6", cy: "12", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p8" } },
+        { tag: "circle", attrs: { cx: "12", cy: "12", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p1" } },
+        { tag: "circle", attrs: { cx: "18", cy: "12", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p6" } },
+        { tag: "circle", attrs: { cx: "6", cy: "18", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p3" } },
+        { tag: "circle", attrs: { cx: "12", cy: "18", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p7" } },
+        { tag: "circle", attrs: { cx: "18", cy: "18", r: "1.6", class: "uxl-grid3x3-dot uxl-grid3x3-dot--p4" } },
+      ],
+    },
     grid4x4: {
       viewBox: "0 0 24 24",
       mode: "fill",
@@ -2274,6 +2318,7 @@
           if (v == null) continue;
           n.setAttribute(k, String(v));
         }
+        if (elSpec.text != null) n.textContent = String(elSpec.text);
         svg.append(n);
       }
     } else if (Array.isArray(spec.paths)) {
